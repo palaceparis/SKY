@@ -1,0 +1,71 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+```
+
+```{r startup}
+appURL <- 'https://my.skyallmarkets.com/SuperAdmin/Dashboard'
+username = "admin@skyallmarkets.com"
+password = "123temp$"
+rD <- rsDriver(browser = "chrome", port = 3567L, chromever = "92.0.4515.43")
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login and go to account/user/trading}
+remDr$findElement(using = 'xpath', '//*[@id="username"]')$sendKeysToElement(list(username))
+remDr$findElement(using = 'xpath', '//*[@id="password"]')$sendKeysToElement(list(password))
+remDr$findElement(using = 'xpath', '//*[@id="formLogin"]/div[5]/input')$clickElement()
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#page-header > div.menu__7UixM > ul > li:nth-child(8) > a")$clickElement() # go to account
+```
+
+```{r}
+account = read_excel("task_disable.xlsx")
+info = data.frame(acc = numeric(),
+                  link = character(),
+                  email = character())
+error_trace = data.frame(reason = character(), name = character(), email = character())
+for (i in 1:nrow(account)){
+email = account$email[i]
+remDr$findElement(using = 'xpath', '//*[@id="gs_EmailAddress"]')$sendKeysToElement(list(email))
+remDr$findElement(using = 'xpath', '//*[@id="gs_EmailAddress"]')$sendKeysToElement(list(key = "enter"))
+Sys.sleep(4)
+
+skip_to_next <- FALSE
+tryCatch(link  <-  remDr$findElement(using = 'xpath', '//*[@id="1"]/td[6]/a')$getElementAttribute("href")[[1]]
+, error = function(e) {skip_to_next <<- TRUE})
+if(skip_to_next) {
+  info[nrow(info)+1,] = c(account$name[i], "none", email)
+  error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row link ",i), name = account$name[i], email = account$email)
+  next
+  } else{info[nrow(info)+1,] = c(account$name[i], link, email)}
+remDr$refresh()
+Sys.sleep(4)
+}
+```
+
+```{r}
+
+
+
+url = remDr$getPageSource()[[1]] %>%
+  read_html() %>%
+  html_nodes("td:nth-child(6)") %>%
+  html_nodes(xpath = "./a") %>% 
+  read_html()
+for (i in nrow(as.data.frame(url))
+  html_attr('href') %>% 
+  str_c("https://broker.skyallmarkets.com", .)
+```
+

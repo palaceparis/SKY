@@ -1,0 +1,407 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+```
+
+```{r startup}
+appURL <- 'https://broker.skyallmarkets.com/'
+username = "client@skyallmarkets.com"
+password = "OperationClient1234"
+rD <- rsDriver(browser = "chrome", port = 6555L, chromever = "92.0.4515.43")
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login and go to account/user/trading}
+remDr$findElement(using = 'css selector', "#userName")$sendKeysToElement(list(username))
+remDr$findElement(using = 'css selector', "#passWord")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#submit")$clickElement()
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#page-header > div.menu__7UixM > ul > li:nth-child(8) > a")$clickElement() # go to account
+remDr$refresh()
+```
+
+```{r}
+acc_links = data.frame(acc = character(), link = character())
+
+for (i in 1:2){
+link = remDr$getPageSource()[[1]] %>%
+  read_html() %>%
+  html_nodes(".lean-table-cell a") %>%
+  html_attr('href') %>% 
+  str_c("https://broker.skyallmarkets.com", .)
+acc = remDr$getPageSource()[[1]] %>%
+  read_html() %>%
+  html_nodes(".lean-table-cell a") %>%
+  html_text()
+  temp = tibble(acc = acc, link = link)
+acc_links = rbind(acc_links, temp) 
+remDr$findElement(using = 'xpath', value ="//a[normalize-space()='Next Page']" )$clickElement()
+Sys.sleep(2)
+}
+
+```
+
+```{r}
+error_trace = data.frame(acc = character(),
+                         link = character())
+name_info <- data.frame(name = character(),
+                        count = numeric(),
+                        link = character())
+error_track <- data.frame(account = numeric(),
+                        name = numeric(),
+                        warning = character(),
+                        errors = character())
+# error_trace = error_trace[-1,]
+# row.names(error_trace) <- NULL
+acc_links= error_trace
+``` 
+
+
+```{r download all (pdf and images)}
+# size_info <- data.frame(name = character(),
+#                         file_number = character(),
+#                         size= numeric())
+dir.create("F:/Webscraping/images")
+work_dir <- "F:/Webscraping/images"
+setwd(work_dir)
+# acc_links = error_trace
+for (i in 1:nrow(acc_links)){
+remDr$navigate(acc_links$link[i])
+error_track_account =   acc_links$link[i]
+Sys.sleep(4)
+
+skip_to_next <- FALSE
+tryCatch(
+    name <- remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_nodes(xpath ='//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[1]/div[2]/div/div/div/div') %>% 
+  html_text(),
+  # name  <-  remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[1]/div[2]/div[1]/div/div/div')$getElementText()[[1]],
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot find name ",i), link = acc_links$link[i])
+  next} else{}
+
+  #   warn <- err <- NULL
+  #   skip_to_next <- FALSE
+  # value <- withCallingHandlers(
+  #   tryCatch(t <- 
+               dir.create(name)
+  #            , error=function(e) {
+  #     err <<- e
+  #     skip_to_next <<- TRUE
+  #   }), warning=function(w) {
+  #     warn <<- w
+  #     invokeRestart("muffleWarning")
+  #   })
+  # if(skip_to_next) {
+  # error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot create name folder " ,i), link = acc_links$link[i])
+  # temp = tibble(account = error_track_account, name = name, warning = as.character(warn), errors = as.character(err))
+  # error_track = rbind(error_track, temp)
+  # next} else{}
+
+# skip_to_next <- FALSE
+# tryCatch(dir.create(name),
+#   error = function(e) { skip_to_next <<- TRUE}
+# )
+# if(skip_to_next) {
+#   error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot create name folder ",i), link = acc_links$link[i])
+#   next} else{}
+
+  name_info[nrow(name_info)+1,] = c(name, length(grep(name, name_info$name)), acc_links$link[i])
+
+skip_to_next <- FALSE
+tryCatch(setwd(name),
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot setwdr ",i), link = acc_links$link[i])
+  next} else{}
+
+skip_to_next <- FALSE
+tryCatch(
+remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/ul/li[4]")$clickElement(),
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot click Client info ",i), link = acc_links$link[i])
+  setwd('..')
+  next} else{}
+
+Sys.sleep(1)
+
+# skip_to_next <- FALSE
+# tryCatch(
+# remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/ul/li[6]")$clickElement(),
+#   error = function(e) { skip_to_next <<- TRUE}
+# )
+# if(skip_to_next) {
+#   error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot click Doc ",i), link = acc_links$link[i])
+#   setwd('..')
+#   next} else{}
+
+# remDr$navigate("https://broker.skyallmarkets.com/accountmgmt/12255?vendor=MT4&serverId=4011")
+link_pdf = remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_nodes('.icon-lw-close+ span') %>% 
+  html_text()%>% 
+  str_c("https://broker.skyallmarkets.com/ali/oss/preview/leanwork-fs?fName=tw/prod/T002642/",.)
+name_pdf = remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_nodes('.icon-lw-close+ span') %>% 
+  html_text()
+pdf_info = tibble(name_pdf, link_pdf)
+pdf_info = pdf_info %>% filter(str_sub((link_pdf), -3, -1) == "pdf")
+
+skip_to_next <- FALSE
+tryCatch(
+walk2(pdf_info$link_pdf, basename(pdf_info$name_pdf), download.file, mode = 'wb'),
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot downloade pdf Doc ",i), link = acc_links$link[i])
+  } else{}
+
+src = remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_nodes(".lean-upload-container img") %>% 
+  html_attr("src") %>% tibble()
+if (is_empty(src$.)){
+  #   num_files = length(list.files()) 
+  # files<-list.files()
+  # vect_size <- sapply(files, file.size)
+  # size_files <- sum(vect_size)
+  # size_info[nrow(size_info)+1,] =c(name, 0, 0)
+  setwd('..')
+  next
+} else{
+for (i in 1:nrow(as.data.frame(src))){
+  if (identical(substr(src$.[i], 1, 3), "//b")){
+  url = str_c("https:", src$.[i]) 
+    warn <- err <- NULL
+    skip_to_next <- FALSE
+  value <- withCallingHandlers(
+    tryCatch(walk2(url, basename(url), download.file, mode = "wb",  Sys.sleep(2)), error=function(e) {
+      err <<- e
+      skip_to_next <<- TRUE
+      NULL
+    }), warning=function(w) {
+      warn <<- w
+      invokeRestart("muffleWarning")
+    })
+  if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot downloade images1 ",i), link = acc_links$link[i])
+  temp = tibble(account = error_track_account, name = name, warning = as.character(warn), errors = as.character(err))
+  error_track = rbind(error_track, temp)
+  } else{}
+  #   skip_to_next <- FALSE
+#   tryCatch(
+#     # download.file(url, basename(url), mode = "wb",  Sys.sleep(2)),
+#     walk2(url, basename(url), download.file, mode = "wb",  Sys.sleep(2)),
+#   error = function(e) { err <<- e
+#   skip_to_next <<- TRUE}
+# )
+# if(skip_to_next) {
+#   error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot downloade images ",i), link = acc_links$link[i])
+#   } else{}
+
+} else{
+  
+  url = str_c("https://broker.skyallmarkets.com/", src$.[i])
+    warn <- err <- NULL
+    skip_to_next <- FALSE
+  value <- withCallingHandlers(
+    tryCatch(walk2(url, basename(url), download.file, mode = "wb",  Sys.sleep(2)), error=function(e) {
+      err <<- e
+      skip_to_next <<- TRUE
+      NULL
+    }), warning=function(w) {
+      warn <<- w
+      invokeRestart("muffleWarning")
+    })
+  if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot downloade images2 ",i), link = acc_links$link[i])
+  temp = tibble(account = acc_links$acc[i], name = name, warning = as.character(warn), errors = as.character(err))
+  error_track = rbind(error_track, temp)
+  } else{}
+  
+  
+  
+  
+  
+#   url = str_c("https://broker.skyallmarkets.com/", src$.[i]) 
+#    # download.file(url, basename(url), mode = "wb",  Sys.sleep(2))
+#   skip_to_next <- FALSE
+# tryCatch(
+#     walk2(url, basename(url), download.file, mode = "wb",  Sys.sleep(2)),
+#   error = function(e) { skip_to_next <<- TRUE}
+# )
+# if(skip_to_next) {
+#   error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot downloade images ",i), link = acc_links$link[i])
+#   } else{}
+  
+}
+ 
+  }
+    setwd('..') 
+}
+}
+# remDr$navigate("https://broker.skyallmarkets.com/accountmgmt/13029?vendor=MT4&serverId=4011")
+# match("12687",acc_links$acc) # get row index
+```
+
+
+```{r work on error_trace}
+# error_trace = error_trace[-c(2:11), ]
+dir.create("F:/Webscraping/images")
+work_dir <- "F:/Webscraping/images"
+setwd(work_dir)
+# acc_links = error_trace
+for (i in 14:24){
+remDr$navigate(error_trace$link[i])
+Sys.sleep(4)
+
+skip_to_next <- FALSE
+tryCatch(
+  name <- remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_nodes('.search-customer__2H4hU .lean-select-value') %>% 
+  html_text(),
+  # name  <-  remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[1]/div[2]/div[1]/div/div/div')$getElementText()[[1]],
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot find name ",i), link = error_trace$link[i])
+  next} else{}
+
+skip_to_next <- FALSE
+tryCatch(dir.create(name),
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot create name folder ",i), link = error_trace$link[i])
+  next} else{}
+
+  name_info[nrow(name_info)+1,] = c(name, length(grep(name, name_info$name)), error_trace$link[i])
+
+skip_to_next <- FALSE
+tryCatch(setwd(name),
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot setwdr ",i), link = error_trace$link[i])
+  next} else{}
+
+skip_to_next <- FALSE
+tryCatch(
+remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/ul/li[4]")$clickElement(),
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot click Client info ",i), link = error_trace$link[i])
+  setwd('..')
+  next} else{}
+
+Sys.sleep(3)
+
+skip_to_next <- FALSE
+tryCatch(
+remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/ul/li[6]")$clickElement(),
+  error = function(e) { skip_to_next <<- TRUE}
+)
+# if(skip_to_next) {
+#   error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot click Doc ",i), link = error_trace$link[i])
+#   setwd('..')
+#   next} else{}
+
+# remDr$navigate("https://broker.skyallmarkets.com/accountmgmt/12255?vendor=MT4&serverId=4011")
+link_pdf = remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_nodes('.icon-lw-close+ span') %>% 
+  html_text()%>% 
+  str_c("https://broker.skyallmarkets.com/ali/oss/preview/leanwork-fs?fName=tw/prod/T002642/",.)
+name_pdf = remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_nodes('.icon-lw-close+ span') %>% 
+  html_text()
+pdf_info = tibble(name_pdf, link_pdf)
+pdf_info = pdf_info %>% filter(str_sub((link_pdf), -3, -1) == "pdf")
+
+skip_to_next <- FALSE
+tryCatch(
+walk2(pdf_info$link_pdf, basename(pdf_info$name_pdf), download.file, mode = 'wb'),
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot downloade pdf Doc ",i), link = error_trace$link[i])
+  } else{}
+
+src = remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_nodes(".lean-upload-container img") %>% 
+  html_attr("src") %>% tibble()
+if (is_empty(src$.)){
+  #   num_files = length(list.files()) 
+  # files<-list.files()
+  # vect_size <- sapply(files, file.size)
+  # size_files <- sum(vect_size)
+  size_info[nrow(size_info)+1,] =c(name, 0, 0)
+  setwd('..')
+  next
+} else{
+for (i in 1:nrow(as.data.frame(src))){
+  if (identical(substr(src$.[i], 1, 3), "//b")){
+  str_c("https:", src$.[i])%>% 
+  walk2(., basename(.), download.file, mode = "wb",  Sys.sleep(2))
+
+} else{
+  str_c("https://broker.skyallmarkets.com/", src$.[i]) %>% 
+    walk2(., basename(.), download.file, mode = "wb",  Sys.sleep(2))
+  
+}
+
+}
+  num_files = length(list.files()) 
+  files<-list.files()
+  vect_size <- sapply(files, file.size)
+  size_files <- sum(vect_size)
+  size_info[nrow(size_info)+1,] =c(name, num_files, size_files)
+    setwd('..')
+  }
+  
+}
+# remDr$navigate("https://broker.skyallmarkets.com/accountmgmt/13029?vendor=MT4&serverId=4011")
+# match("12687",acc_links$acc) # get row index
+```
+
+
+```{r}
+myTryCatch <- function(expr) {
+  warn <- err <- NULL
+  value <- withCallingHandlers(
+    tryCatch(expr, error=function(e) {
+      err <<- e
+      NULL
+    }), warning=function(w) {
+      warn <<- w
+      invokeRestart("muffleWarning")
+    })
+  list(value=value, warning=warn, error=err)
+}
+
+myTryCatch(sssssssss)
+```
+

@@ -1,0 +1,328 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)  
+```
+
+```{r startup}
+appURL <- 'https://broker.skyallmarkets.com/'
+username = "client@skyallmarkets.com"
+password = "OperationClient1234"
+rD <- rsDriver(browser = "chrome", port = 5567L, chromever = "92.0.4515.43")
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login and go to account/user/trading}
+remDr$findElement(using = 'css selector', "#userName")$sendKeysToElement(list(username))
+remDr$findElement(using = 'css selector', "#passWord")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#submit")$clickElement()
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#page-header > div.menu__7UixM > ul > li:nth-child(8) > a")$clickElement() # go to account
+# remDr$navigate("https://broker.skyallmarkets.com/usermgmt") # go to user
+remDr$navigate("https://broker.skyallmarkets.com/reportmgmt/reports/HistoryOrder") # go to trading   history
+```
+
+
+# Task CHN Trading Volume
+
+Get CHN trading volume of sales in CHN. ECN means group that ends with "-1"
+```{r}
+acc_raw4 = read_excel("acc_raw4.xlsx")
+special = acc_raw4 %>% filter(str_sub(acc_raw4$group,-2,-1) == "-1")
+```
+
+```{r}
+data = read_excel("wulei.xlsx") %>% janitor::clean_names()
+sales_today = data.frame(value = character())
+for (i in 1:nrow(data)){
+  if (is.na(data$direct_ib[i])){
+     input_name = data$name[i]
+  } else{
+ input_name = data$direct_ib[i]}
+ if (input_name %in% sales_man$name){
+    sales_today[nrow(sales_today)+1,] = input_name
+ } else{
+ position = user_information %>% drop_na(superior) %>%  filter(name ==input_name)
+ if (nrow(position) > 1){
+   sales_today[nrow(sales_today)+1,] = "nrwoposition_greater_than_1"
+ } 
+ else if (nrow(position) == 0){
+   sales_today[nrow(sales_today)+1,] = "nrwoposition_equals_0"
+ } else{
+   if (position$superior %in% sales_man$name){
+     sales_today[nrow(sales_today)+1,] = position$superior
+   } else{
+     continue <- TRUE
+     while(continue){
+       input_name  <-  position$superior[1]
+       position <- user_information[user_information$name == input_name, ]
+       if(position$superior %in% sales_man$name){
+         continue <- FALSE
+       }
+     }
+     sales_today[nrow(sales_today)+1,] = position$superior[1]
+   }
+ }
+}
+
+}
+data_sales = cbind(data, sales_today)
+data_specific = data_sales %>% filter(value == "吴磊")
+vis_miss(data_specific)
+```
+
+```{r}
+acc = data_specific %>% select(account) %>% distinct()
+special_row  = acc %>% filter(account %in%special$account)
+
+data_specific %>% filter(account %nin% special_row$account) %>% summarise(
+  st_volume = sum(volume)
+)
+
+data_specific %>% filter(account %in% special_row$account) %>% summarise(
+  ecn_volume = sum(volume)
+)
+```
+
+# Task Change mt group and direct IB
+```{r}
+# remDr$refresh()
+raw = read_excel("cate_2.xlsx")
+
+info = data.frame(acc = numeric(),
+                  link = character())
+for (i in 24:nrow(raw)){
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div[3]/div[2]/span/span/input')$sendKeysToElement(list(as.character(raw$acc[i])))
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div[3]/div[2]/span/span/input')$sendKeysToElement(list(key = "enter"))
+Sys.sleep(3)
+link = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/table/tbody/tr[1]/td[3]/a')$getElementAttribute("href")[[1]]
+info[nrow(info)+1,] = c(raw$acc[i], link)
+remDr$refresh()
+Sys.sleep(7)
+}
+```
+
+```{r}
+for (i in 24:nrow(info)){
+remDr$navigate(info$link[i])
+Sys.sleep(5)
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[1]/div[2]/div/div[1]/div[2]/div/div/div/div/div')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[1]/div[2]/div/div[1]/div[2]/div/div/div[2]/div/div/div/span/span/input')$sendKeysToElement(list("SK-U-R-PH")) 
+
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[1]/div[2]/div/div[1]/div[2]/div/div/div[2]/div/div/div/ul/li')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[3]/button[1]')$clickElement()
+Sys.sleep(2)
+}
+```
+
+```{r}
+for (i in 1:nrow(info2)){
+  if (str_sub(info2$group[i], -4, -1) == "70-2"){
+    
+    
+    remDr$navigate(info2$link[i])
+    Sys.sleep(4)
+    remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[1]/div[1]/div/div/div')$clickElement()
+    Sys.sleep(2)
+    remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[1]/div[1]/div/div[2]/div/div/div/span/span/input')$sendKeysToElement(list("7904"))
+    Sys.sleep(2)
+        remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[1]/div[1]/div/div[2]/div/div/div/ul/li[2]')$clickElement()
+        Sys.sleep(2)
+        
+    remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[1]/div[2]/div/div[1]/div[2]/div/div/div/div/div')$clickElement()  
+    Sys.sleep(2)
+    remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[1]/div[2]/div/div[1]/div[2]/div/div/div[2]/div/div/div/span/span/input')$sendKeysToElement(list("SK-U-30-0-25-2")) 
+    Sys.sleep(2)
+         remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[1]/div[2]/div/div[1]/div[2]/div/div/div[2]/div/div/div/ul/li')$clickElement()  
+         Sys.sleep(2)
+        remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[3]/button[1]')$clickElement() 
+        Sys.sleep(2)
+  } else{
+    next
+  }
+}
+```
+
+# Task change IB in customer
+```{r}
+remDr$navigate("https://broker.skyallmarkets.com/custommgmt/customers?userId=228&userName=Norres%20John%20Cardinales")
+link_frame = data.frame(name = character(), 
+                  link = character())
+for (j in 1:2){
+for (i in 1:20){
+link = remDr$findElement(using = 'xpath', paste0("//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/table/tbody/tr[", i,"]/td[4]/a"))$getElementAttribute("href")
+
+name = remDr$findElement(using = 'xpath', paste0("//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/table/tbody/tr[", i,"]/td[4]/a"))$getElementText()
+
+link_frame[nrow(link_frame)+1,] = c(name, link)
+}
+  if (j<2){
+    remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/div/ul/li[4]/a')$clickElement()
+  }
+  }
+
+```
+
+```{r}
+for (i in 9:nrow(link_frame)){
+    remDr$navigate(link_frame$link[i])
+    Sys.sleep(4)
+    remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div/div[1]/div/div/div/div[2]/div[2]/div[1]/div/div/div/button')$clickElement()
+    Sys.sleep(2)
+    remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div/div[1]/div/div/div/div[2]/div[2]/div[1]/div/div/ul/li[1]/input')$sendKeysToElement(list("7904"))
+    Sys.sleep(2)
+        remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div/div[1]/div/div/div/div[2]/div[2]/div[1]/div/div/ul/li[3]/a')$clickElement()
+        Sys.sleep(2)
+}
+```
+
+# Task update potential clients
+```{r}
+link_frame = data.frame(name = character(),
+                  status = character(),
+                  link = character())
+for (i in 1:10){
+
+link = remDr$findElement(using = 'xpath', paste0("//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/table/tbody/tr[", i,"]/td[1]/a"))$getElementAttribute("href")
+
+name = remDr$findElement(using = 'xpath', paste0("//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/table/tbody/tr[", i,"]/td[2]"))$getElementText()
+
+status = remDr$findElement(using = 'xpath', paste0("//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/table/tbody/tr[", i,"]/td[11]/button"))$getElementText()
+
+link_frame[nrow(link_frame)+1,] = c(name, status, link)
+
+}
+```
+
+```{r}
+info_frame = data.frame(name = character(),
+                  phone = character(),
+                  email = character())
+for (i in 1:nrow(link_frame)){
+  if (link_frame$status[i] == "Process"){
+    remDr$navigate(link_frame$link[i])
+    Sys.sleep(4)
+    name = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/span/div/div[2]/div[1]/div[2]/div/div[2]/div[2]/div/div[2]/div[1]/div[1]/div[2]/div[2]/div/span/input')$getElementAttribute("value")[[1]]
+    phone = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/span/div/div[2]/div[1]/div[2]/div/div[2]/div[2]/div/div[2]/div[1]/div[1]/div[4]/div[2]/div/div/div[2]/span/input')$getElementAttribute("value")[[1]]
+    email = remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/span/div/div[2]/div[1]/div[2]/div/div[2]/div[2]/div/div[2]/div[1]/div[1]/div[3]/div[2]/div/span/input")$getElementAttribute("value")[[1]]
+    info_frame[nrow(info_frame)+1,] = c(name, phone, email)
+    
+  } else{
+  next
+}
+
+}
+
+write.xlsx(info_frame, "task_potential.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+
+# Task Yoonit
+
+Find the number of copiers under each account
+```{r}
+appURL <- 'https://yoonit-skyalliance.azurewebsites.net/'
+username = "operation.s@skyallmarkets.com"
+password = "TeJs0n!21da"
+rD <- rsDriver(browser = "chrome", port = 6567L, chromever = "92.0.4515.43")
+remDr <- rD$client
+remDr$navigate(appURL)
+
+remDr$findElement(using = 'css selector', "#email")$sendKeysToElement(list(username))
+remDr$findElement(using = 'css selector', "#password")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#SubmitBtn")$clickElement()
+Sys.sleep(2)  
+  
+```
+
+```{r}
+# file = read_excel("Book1.xlsx")
+
+# remDr$refresh()
+infor_frame = data.frame(number = numeric())
+
+for (i in 1:nrow(file)){
+remDr$findElement(using = 'xpath', '//*[@id="filterInput"]')$sendKeysToElement(list(as.character(file$Account[i])))
+remDr$findElement(using = 'xpath', '//*[@id="filterInput"]')$sendKeysToElement(list(key = "enter"))
+  Sys.sleep(3)
+remDr$findElement(using = 'xpath', '//*[@id="LoadSignalsTable"]/tbody/tr/td[1]/div/label/button')$clickElement()
+  Sys.sleep(3)
+j = 0
+for (i in 1:50){
+    skip_to_next <- FALSE
+    tryCatch(number<-remDr$findElement(using = 'xpath', paste0("//*[@id='GetSignalCopiers']/tbody/tr[", i,"]/td[1]/div/label"))$getElementText()[[1]], error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      break
+      } else{
+        j = j+1
+      }
+    
+}
+infor_frame[nrow(infor_frame)+1,] = j 
+
+remDr$findElement(using = 'xpath', '//*[@id="root"]/div[1]/div[2]/div[2]/div/div/nav[2]/button/span')$clickElement()
+  Sys.sleep(3)
+}
+write.xlsx(as.data.frame(infor_frame), "task_yoonit.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+
+# Task account capital retrieve
+
+```{r}
+remDr$refresh()
+
+
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div[3]/div[2]/span/span/input')$sendKeysToElement(list("11728"))
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div[3]/div[2]/span/span/input')$sendKeysToElement(list(key = "enter"))
+link = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/table/tbody/tr[1]/td[3]/a')$getElementAttribute("href")[[1]]
+remDr$navigate(link)
+
+
+library(rvest)
+table_list = remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_table()
+table = table_list[[1]]
+
+for (i in 2:12){
+table_list = remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_table()
+temp = table_list[[1]]
+table = rbind(table, temp)
+if (i<13){
+  remDr$findElement(using = 'xpath', "//div[@class='lean-collapseitem-content lean-collapseitem-content-active']//div//li[@title='下一页']//a[@class='lean-pagination-item-link']")$clickElement()
+  Sys.sleep(3)
+  } else{}
+}
+
+table = table %>% clean_names()
+tem1 = table %>% filter(startsWith(comments, "d"))
+library(tidyr)
+extract_numeric(tem1$quantity) %>% as.data.frame() %>% sum()
+```
+
+# Task account retrieve (second time)
+
+```{r}
+num1 = read_excel("raw1001_1200.xlsx")
+num2 = read_excel("raw1201_1400.xlsx")
+num3 = read_excel("raw1401_1600.xlsx")
+num4 = read_excel("raw1601_1800.xlsx")
+num5 = read_excel("raw1801_2064.xlsx")
+raw1001_2604 = rbind(num1, num2, num3, num4, num5)
+acc_1_2604 = rbind(raw1_1000, raw1001_2604)
+```

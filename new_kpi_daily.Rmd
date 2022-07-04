@@ -1,0 +1,50 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+library(here)
+```
+
+```{r login}
+rD <- rsDriver(browser = "chrome", port = 5677L, chromever = "92.0.4515.43")
+remDr <- rD$client
+appURL <- 'https://my.skyallmarkets.com/SuperAdmin/Dashboard'
+remDr$navigate(appURL)
+Sys.sleep(3)
+username = "admin@skyallmarkets.com"
+password = "123temp$"
+remDr$findElement(using = 'xpath', '//*[@id="username"]')$sendKeysToElement(list(username))
+remDr$findElement(using = 'xpath', '//*[@id="password"]')$sendKeysToElement(list(password))
+remDr$findElement(using = 'xpath', '//*[@id="formLogin"]/div[5]/input')$clickElement()
+```
+
+```{r}
+library("data.table")
+raw <- fread(here("data", "sep22.csv"), header=TRUE, sep=",", colClasses = "numeric", encoding = "UTF-8") %>% janitor::clean_names()
+d_w = raw %>% filter(deposit != 0 | withdraw != 0)
+without_rebate = d_w %>% filter(category != "Introducing Broker")
+without_aj = without_rebate %>% filter(sales_admin != "Anne Sabiniano")
+```
+
+```{r}
+net_d_w = without_rebate %>% group_by(sales_admin) %>% 
+   summarise(net = sum(deposit)+sum(withdraw),
+           count = n_distinct(platform_login))
+```
+
+
+```{r trading volume}
+raw_trader = raw %>% filter(category == "Trader")
+volume = raw_trader %>% group_by(sales_admin) %>%
+ summarise(net = sum(volume))
+```
+

@@ -1,0 +1,152 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library("xlsx")
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+library(here)
+```
+
+```{r login}
+rD <- rsDriver(browser = "chrome", port = 4777L, chromever = "92.0.4515.43")
+remDr <- rD$client
+appURL <- 'https://my.skyallmarkets.com/SuperAdmin/Dashboard'
+remDr$navigate(appURL)
+Sys.sleep(3)
+username = "admin@skyallmarkets.com"
+password = "123temp$"
+remDr$findElement(using = 'xpath', '//*[@id="username"]')$sendKeysToElement(list(username))
+remDr$findElement(using = 'xpath', '//*[@id="password"]')$sendKeysToElement(list(password))
+remDr$findElement(using = 'xpath', '//*[@id="formLogin"]/div[5]/input')$clickElement()
+```
+
+```{r}
+ib_ls = data.frame(status = character(),
+                      link = character())
+page = 5
+for (i in 2:page){
+  link = remDr$getPageSource()[[1]] %>%
+    read_html() %>%
+    html_nodes("td:nth-child(6) a") %>%
+    html_attr("href") %>%
+    str_c("https://my.skyallmarkets.com/SuperAdmin/", .) %>% 
+    tibble() %>% 
+    setNames("link")
+  status = remDr$getPageSource()[[1]] %>%
+    read_html() %>%
+    html_nodes("td:nth-child(15)") %>%
+    html_text() %>%
+    tibble() %>% 
+    setNames("status")
+  status = status[-1,]
+  temp = tibble(status, link)
+  ib_ls = rbind(ib_ls, temp)
+  remDr$findElement(using = 'xpath', 
+                    value = "//span[@class='ui-icon ui-icon-seek-next']")$
+    clickElement()
+  Sys.sleep(3)
+}
+l_s = ib_ls
+```
+
+
+```{r}
+for (i in 107:nrow(l_s)){
+  if (l_s$status[i] == "Approved"){
+    remDr$navigate(l_s$link[180])
+    Sys.sleep(1)
+    remDr$findElement(using = 'xpath',
+                      value = '/html/body/div[1]/div[1]/aside/nav/ul/li[5]/a/strong')$
+      clickElement()
+    Sys.sleep(1)
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="artFeeGrp"]/ul/li/button')$
+      clickElement()
+    Sys.sleep(2)
+    
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeeAccountCurrency_chzn"]/a/span')$
+      clickElement()
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeeAccountCurrency_chzn"]/div/div/input')$
+      sendKeysToElement(list("USD"))
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeeAccountCurrency_chzn"]/div/div/input')$
+      sendKeysToElement(list(key = "enter"))
+    Sys.sleep(2)
+    
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeePlatform_chzn"]/a/span')$
+      clickElement()
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeePlatform_chzn"]/div/div/input')$
+      sendKeysToElement(list("Meta Trader 4"))
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeePlatform_chzn"]/div/div/input')$
+      sendKeysToElement(list(key = "enter"))
+    Sys.sleep(2)
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeeWidenSpread_chzn"]/a/span')$
+      clickElement()
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeeWidenSpread_chzn"]/div/div/input')$
+      sendKeysToElement(list("0"))
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeeWidenSpread_chzn"]/div/div/input')$
+      sendKeysToElement(list(key = "enter"))
+    Sys.sleep(2)
+    
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpCommissionMarkup_chzn"]/a/span')$
+      clickElement()
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpCommissionMarkup_chzn"]/div/div/input')$
+      sendKeysToElement(list("0"))
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpCommissionMarkup_chzn"]/div/div/input')$
+      sendKeysToElement(list(key = "enter"))
+    Sys.sleep(2)
+    
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeeGroup_chzn"]/a/span')$
+      clickElement()
+    text = remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeeGroup_chzn_o_1"]')$
+      getElementText()[[1]]
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeeGroup_chzn"]/div/div/input')$
+      sendKeysToElement(list(text))
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpFeeGroup_chzn"]/div/div/input')$
+      sendKeysToElement(list(key = "enter"))
+    Sys.sleep(2)
+    remDr$findElement(using = 'xpath',
+                      value = "//button[normalize-space()='Add Fee Group']")$
+      clickElement()
+    
+    Sys.sleep(3)
+    
+    skip_to_next <- FALSE
+    tryCatch( alert  <-  remDr$findElement(using = 'xpath',
+                      value = '//*[@id="existingFeeGroupAlert"]')$
+      getElementText()[[1]], error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+    remDr$findElement(using = 'xpath',
+                      value = "//a[normalize-space()='active']")$
+      clickElement()
+    Sys.sleep(3)
+    remDr$findElement(using = 'xpath',
+                      value = "//input[@value='Make Primary']")$
+      clickElement()
+    Sys.sleep(2)
+      } else{
+      next
+      }
+  } else{next}
+}
+
+```
+

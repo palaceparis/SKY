@@ -1,0 +1,177 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+```
+
+```{r startup}
+appURL <- 'https://broker.skyallmarkets.com/'
+username = "client@skyallmarkets.com"
+password = "OperationClient1234"
+rD <- rsDriver(browser = "chrome", port = 5567L, chromever = "92.0.4515.43")
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login and go to account/user/trading}
+remDr$findElement(using = 'css selector', "#userName")$sendKeysToElement(list(username))
+remDr$findElement(using = 'css selector', "#passWord")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#submit")$clickElement()
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#page-header > div.menu__7UixM > ul > li:nth-child(8) > a")$clickElement() # go to account
+# remDr$navigate("https://broker.skyallmarkets.com/usermgmt") # go to user
+remDr$navigate("https://broker.skyallmarkets.com/reportmgmt/reports/HistoryOrder") # go to trading   history
+```
+
+# KPI
+```{r read files and get d/w comments}
+# raw = read_excel("aug02.xlsx") %>% janitor::clean_names()
+library("data.table")
+raw <- fread("sep01.csv", header=TRUE, sep=",", colClasses = "numeric", encoding = "UTF-8") %>% janitor::clean_names()
+d_w = getKPIdw(raw)
+row.names(d_w) <- NULL
+d_w$direct_ib[d_w$direct_ib == ""] <- NA
+```
+
+```{r add sales}
+sales_today = data.frame(value = character())
+for (i in 1:nrow(d_w)){
+  if (is.na(d_w$direct_ib[i])){
+     input_name = d_w$name[i]
+  } else{
+ input_name = d_w$direct_ib[i]}
+ if (input_name %in% sales_man$name){
+    sales_today[nrow(sales_today)+1,] = input_name
+ } else{
+ position = user_information %>% drop_na(superior) %>%  filter(name ==input_name)
+ if (nrow(position) > 1){
+   sales_today[nrow(sales_today)+1,] = "nrwoposition_greater_than_1"
+ } 
+ else if (nrow(position) == 0){
+   sales_today[nrow(sales_today)+1,] = "nrwoposition_equals_0"
+ } else{
+   if (position$superior %in% sales_man$name){
+     sales_today[nrow(sales_today)+1,] = position$superior
+   } else{
+     continue <- TRUE
+     while(continue){
+       input_name  <-  position$superior[1]
+       position <- user_information[user_information$name == input_name, ]
+       if(position$superior %in% sales_man$name){
+         continue <- FALSE
+       }
+     }
+     sales_today[nrow(sales_today)+1,] = position$superior[1]
+   }
+ }
+}
+
+}
+d_w = cbind(d_w, sales_today)
+# d_w$value[5] = "Mark Daniel Lau"
+# d_w$value[6] = "Mark Daniel Lau"
+# d_w$value[13] = "Mark Daniel Lau"
+# d_w$value[15] = "Mark Daniel Lau"
+```
+ 
+```{r remove rebate withdrawl and get net deposit}
+# firstly you need to make sure whether there is rebate deposit
+d_w %>% filter(d_w$account %in% user_information$acc_number)
+d_w_sales_without_rebate = d_w %>% filter(d_w$account %nin% user_information$acc_number)
+# d_w_sales_without_rebate$value[10] = "Jesse Alfaro Guisinga"
+# d_w_sales_without_rebate$value[8] = "Jeryl Francis G. Cortez"
+# d_w_sales_without_rebate = d_w_sales_without_rebate %>% filter(value != "nrwoposition_equals_0")
+d_w_sales_without_rebate = d_w_sales_without_rebate[-c(10:12),]
+# d_w_sales_without_rebate$value[12] = "Jesse Alfaro Guisinga"
+# d_w_sales_without_rebate$deposit = d_w_sales_without_rebate$deposit %>% as.numeric()
+# d_w_sales_without_rebate$withdrawal = d_w_sales_without_rebate$withdrawal %>% as.numeric()
+results_list1 = getKPIfinalresults(d_w_sales_without_rebate)[[1]]
+results_list1
+
+ # d_w_sales_without_rebate  %>%
+ #     summarise(net = sum(deposit)+sum(withdrawal),
+ #               count = n_distinct(account))
+ # 
+ #    d_w_sales_without_rebate %>% filter(withdrawal >= 0) %>%
+ #     summarise(funded_count = n_distinct(account))
+```
+
+```{r funded account}
+results_list2 = getKPIfinalresults(d_w_sales_without_rebate)[[2]]
+results_list2
+```
+
+
+```{r double check}
+# d_w_sales_without_rebate %>%  summarise(net = sum(deposit)+sum(withdrawal))
+```
+
+# Trading Volume
+```{r trading volume}
+php_sales = data.frame(name = character(), id = character(), trading_volume = numeric())
+php_sales[1, 1] = "Adrian Viray"
+php_sales[1, 2] = "1004"
+php_sales[2, 1] = "Mark Daniel Lau"
+php_sales[2, 2] = "1043"
+php_sales[3, 1] = "Jesse Alfaro Guisinga"
+php_sales[3, 2] = "YZ2E"
+php_sales[4, 1] = "MIGUEL ANDREW GABUNI"
+php_sales[4, 2] = "J30J"
+
+php_sales[5, 1] = "Jeryl Francis G. Cortez"
+php_sales[5, 2] = "Wh9R"
+php_sales[6, 1] = "Anne Jessel Sabiniano"
+php_sales[6, 2] = "1006"
+php_sales[7, 1] = "Norres John Cardinales"
+php_sales[7, 2] = "WO94"
+# php_sales[4, 3] = 0.61
+j = 0
+for (i in 5:nrow(php_sales)){
+input_name = php_sales$id[i]
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div[1]/div/div[1]/div[1]/div/div/span/span[1]')$clickElement()
+
+Sys.sleep(2)
+
+
+remDr$findElement(using = 'class name', 'lean-select-placeholder')$clickElement()
+Sys.sleep(2)
+remDr$findElement(using = 'xpath',
+                  "//span[contains(@class,'lean-select-search lean-input-affix')]//input[contains(@type,'text')]")$sendKeysToElement(list(input_name)) # input id
+Sys.sleep(3)
+
+remDr$findElement(using = 'xpath', "//li[contains(@class,'lean-select-option')]")$clickElement()
+
+Sys.sleep(2)
+
+if (j == 0){
+
+remDr$findElement(using = 'class name', 'lean-calendar-range-picker-input')$clickElement() # cicl cal
+Sys.sleep(2)
+
+remDr$findElement(using = 'xpath', '//a[normalize-space()="Yesterday"]')$clickElement() # click yesterday
+
+
+j = j+1
+}
+Sys.sleep(2)
+
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div[2]/div[1]/div/div[1]/div/div/div[3]/button[1]')$clickElement() # search
+
+Sys.sleep(3)
+
+php_sales[i, 3] = remDr$findElement(using = 'css selector', '#react-root > div > div > div.lean-layout.page-layout__35AfQ > div.lean-layout.page-layout__35AfQ.lean-layout-horizontal > div.lean-layout.page-layout__35AfQ > div.lean-content.layout-content__EsTL9.scrollable-x__1eluV.table__272LF > div > div > table > tbody > tr:nth-child(21) > td:nth-child(7)')$getElementText()
+ Sys.sleep(3)
+ Sys.sleep(3)
+
+}
+```

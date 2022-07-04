@@ -1,0 +1,102 @@
+```{r}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+# library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+```
+
+```{r}
+appURL <- 'https://my.skyamarkets.com/SuperAdmin/Clients'
+username = "admin@skyallmarkets.com"
+password = "123temp$"
+rD <- rsDriver(browser = "chrome", port = 1122L, chromever = "103.0.5060.53")
+# binman::list_versions("chromedriver")
+remDr <- rD$client
+remDr$navigate(appURL)
+Sys.sleep(4)
+# remDr$refresh
+remDr$findElement(using = 'id', "username")$sendKeysToElement(list(username))
+remDr$findElement(using = 'id', "password")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'id', "btn-submit")$clickElement()
+Sys.sleep(2)
+```
+
+```{r}
+  # remDr$findElement(using = 'class', 'cell-wrapper')
+IBs = remDr$getPageSource()[[1]] %>%
+    read_html() %>%
+    html_nodes('#tableMLAParticipants a') %>%
+    html_text() 
+
+IBs = IBs[48:49]
+# which(IBs %in% c("周远敏","永东 许"))
+```
+
+```{r}
+# all_IDs = data.frame(ID = as.numeric())
+for (i in 1:length(IBs)){
+
+remDr$findElement(using = 'xpath', '//*[@id="gs_IBName"]')$sendKeysToElement(list(IBs[i]))
+remDr$findElement(using = 'xpath', '//*[@id="gs_IBName"]')$sendKeysToElement(list(key = "enter"))
+Sys.sleep(6)
+
+account_ID = remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_table()
+account_ID = account_ID[[2]]
+# starting_ID = account_ID[0,]
+starting_ID = rbind(starting_ID, account_ID)
+
+# account_ID = remDr$getPageSource()[[1]] %>%
+#     read_html() %>%
+#     html_nodes('.ui-jqgrid-bdiv , td:nth-child(6)') %>%
+#     html_text()
+# account_ID  = account_ID[3:(length(account_ID)-1)] %>% as.data.frame()
+# all_IDs = rbind(all_IDs, account_ID)
+
+remDr$findElement(using = 'xpath', '//*[@id="gs_IBName"]')$clearElement()
+}
+
+all_IDs = starting_ID
+```
+
+```{r}
+# colnames(all_IDs)[1] = "ID"
+# all_IDs_withoutNULL = all_IDs[!apply(all_IDs == "", 1, all),]
+# all_IDs_withoutNULL[1]
+all_IDs = all_IDs %>% filter(X4 == "Trader")
+all_IDs_withoutNULL = all_IDs$X6
+```
+
+```{r}
+for (i in 1:length(all_IDs_withoutNULL)){
+remDr$findElement(using = 'xpath', '/html/body/div[1]/div[1]/article[2]/div/div/div[3]/div[2]/div/table/thead/tr[2]/th[2]/div/input')$sendKeysToElement(list(as.character(all_IDs_withoutNULL[i])))
+remDr$findElement(using = 'xpath', '/html/body/div[1]/div[1]/article[2]/div/div/div[3]/div[2]/div/table/thead/tr[2]/th[2]/div/input')$sendKeysToElement(list(key = "enter"))
+Sys.sleep(6)
+
+alltables = remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_table()
+r_table = alltables[[6]]
+# starting_table = r_table
+# starting_table = starting_table[0,]
+# starting_table_o = starting_table
+starting_table = rbind(starting_table, r_table)
+
+remDr$findElement(using = 'xpath', '/html/body/div[1]/div[1]/article[2]/div/div/div[3]/div[2]/div/table/thead/tr[2]/th[2]/div/input')$clearElement()
+}
+```
+
+```{r}
+write.xlsx(as.data.frame(starting_table), "mt41.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+

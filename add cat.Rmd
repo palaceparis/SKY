@@ -1,0 +1,76 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+# library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+```
+
+```{r startup}
+appURL <- 'https://my.skyamarkets.com/SuperAdmin/Clients'
+username = "admin@skyallmarkets.com"
+password = "123temp$"
+rD <- rsDriver(browser = "chrome", port = 4412L, chromever = "101.0.4951.15")
+remDr <- rD$client
+remDr$navigate(appURL)
+Sys.sleep(4)
+# remDr$refresh
+remDr$findElement(using = 'id', "username")$sendKeysToElement(list(username))
+remDr$findElement(using = 'id', "password")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'id', "btn-submit")$clickElement()
+Sys.sleep(2)
+
+# go to user
+# remDr$navigate("https://broker.skyallmarkets.com/usermgmt")
+```
+
+
+
+```{r}
+i=0
+repeat {
+    remDr$refresh()
+    Sys.sleep(3)
+    i=i+1
+  remDr$findElement(using = 'css selector', '#artAccountList > article > div.button-box.text-right > button')$clickElement()
+    Sys.sleep(2)
+    #type
+    remDr$findElement(using = 'css selector', '#drpAccountType_chzn > a')$clickElement()
+    remDr$findElement(using = 'css selector', '#drpAccountType_chzn_o_1')$clickElement()
+    Sys.sleep(8)
+    #sp
+    remDr$findElement(using = 'css selector', '#drpProgram_chzn > a > span')$clickElement()
+    remDr$findElement(using = 'css selector', '#drpProgram_chzn_o_1')$clickElement()
+    Sys.sleep(5)
+    # ps
+    remDr$findElement(using = 'css selector', '#drpPlatformServer_chzn > a > span')$clickElement()
+    remDr$findElement(using = 'css selector', '#drpPlatformServer_chzn_o_1')$clickElement()
+    Sys.sleep(5)
+    # fee group
+    remDr$findElement(using = 'css selector', '#drpTradingAccFeeGroup_chzn > a > span')$clickElement()
+    # all_cat = remDr$findElement(using = 'xpath', '/html/body/div[1]/div[2]/div[2]/div[2]/ul/li[1]/div/div/ul')$getElementText()[[1]]
+    remDr$findElement(using = 'css selector', '#drpTradingAccFeeGroup_chzn > div > div > input[type=text]')$sendKeysToElement(list("Trading-STP40"))
+    remDr$findElement(using = 'css selector', '#drpTradingAccFeeGroup_chzn_o_10')$clickElement()
+    Sys.sleep(2)
+    #pw
+    remDr$findElement(using = 'css selector', '#txtAdminPassword')$sendKeysToElement(list("123temp$"))
+    remDr$findElement(using = 'css selector', '#btnAddNewAccount')$clickElement()
+    Sys.sleep(6)
+if (! (i < 1) ) {break}
+}
+
+# all_cat = strsplit(all_cat, "\n", fixed=T)
+# all_cat = all_cat[[1]]
+# saveRDS(all_cat, file = "all_cat.rds")
+# readRDS(file = "all_cat.rds")
+```
+
+

@@ -1,0 +1,111 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+```
+
+
+```{r images}
+library(here)
+acc_links = read_excel(here("second_time_raw","new_rows.xlsx"))
+acc_link = acc_links %>% slice(1:10)
+data = getimagelink(acc_link)
+temp1 = data[[1]]
+data = temp1
+name_list = data %>% select(name) %>% distinct()
+```
+
+
+```{r create name folders}
+  # remove.list <- paste(c("[]", NA))
+  data = data %>% filter(!grepl("accountmgmt", data$link)) %>% drop_na(link)
+  myurl <- data$link
+  df = data.frame(link = character(), name = character(), row_nb = character())
+
+  name_list = data %>% select(name) %>% distinct()
+  
+
+  dir.create("C:/Users/palac/Documents/Webscraping/images")
+
+  work_dir <- "C:/Users/palac/Documents/Webscraping/images"
+  setwd(work_dir)
+
+  for(i in 1:nrow(name_list)){
+    dir.create(name_list$name[[i]])
+  }
+```
+
+```{r download}
+  work_dir <- "C:/Users/palac/Documents/Webscraping/images"
+  setwd(work_dir)
+  for (i in 1:nrow(data)){
+    setwd(data$name[[i]])
+    z <- tempfile()
+    skip_to_next <- FALSE
+    tryCatch(download.file(myurl[i],z,mode="wb"), error = function(e) { skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      df = rbind(df, data.frame(link = data$link[[i]], name = data$name[[i]], row_nb =paste0("Cannot download ",i)))
+      setwd('..')
+      next
+    }
+    else{
+    }
+    if (str_sub(myurl[i],-3,-1) %in% c("jpg", "peg")){
+      skip_to_next <- FALSE
+      tryCatch(pic <- readJPEG(z), error = function(e) { skip_to_next <<- TRUE})
+      if(skip_to_next) {
+        df = rbind(df, data.frame(link = data$link[[i]], name = data$name[[i]], row_nb = i))
+        print(i)
+        setwd('..')
+        next
+      }
+      else{writeJPEG(pic,paste0("image", i, ".jpg"))
+        print(i)
+      }
+    }
+    else{
+      skip_to_next <- FALSE
+      tryCatch(pic <- readPNG(z), error = function(e) { skip_to_next <<- TRUE})
+      if(skip_to_next) {
+        df = rbind(df, data.frame(link = data$link[[i]], name = data$name[[i]], row_nb = i))
+        print(i)
+        setwd('..')
+        next }
+      else{
+        writePNG(pic,paste0("image", i, ".png"))}
+      print(i)
+    }
+    setwd('..')
+  }
+```
+
+```{r pdf check}
+pdf_acc_count = data.frame(acc = numeric(), pdf_count = numeric())
+for (z in 1:nrow(acc_link)){
+remDr$navigate(acc_link$link[z])
+Sys.sleep(5)
+remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/ul/li[4]")$clickElement()
+remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/ul/li[6]")$clickElement()
+j = 0
+for (i in 3:9){
+  skip_to_next <- FALSE
+  tryCatch(temp <- remDr$findElement(using = 'xpath',
+                    paste0('//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/div[4]/div/div[', i, ']/div[2]/div/div/div/div/div/span[2]'))$getElementText(), error = function(e) { skip_to_next <<- TRUE}
+)
+  if(skip_to_next) {next}
+  if (endsWith(temp[[1]], "f") == TRUE){
+    j = j + 1
+  }
+}
+pdf_acc_count[nrow(pdf_acc_count)+1,] = c(acc_link$acc[z], j)
+}
+```

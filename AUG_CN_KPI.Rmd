@@ -1,0 +1,95 @@
+```{r library}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+library(here)
+library(stringi)
+library(Hmisc)
+```
+
+```{r}
+raw = read_excel(here("data", "AUG_capital_report.xlsx")) %>% clean_names()
+raw_used <- raw %>% filter(direct_ib != "Total" | is.na(direct_ib))
+```
+
+# CHN
+```{r}
+column2 = data.frame(Column1 = numeric())
+temp = stri_trans_general(raw_used$name, "latin-ascii") %>% as.data.frame()
+for (i in 1:nrow(temp)){
+if (!stri_enc_isascii(temp$.[i])){
+column2[nrow(column2)+1,] = NA
+}  else{
+column2[nrow(column2)+1,] = 1
+}
+}
+raw_used = cbind(raw_used, column2)
+chn = raw_used %>% filter(is.na(Column1))
+chn = chn %>% select(-Column1)
+d_w_chn = getKPIdw(chn)
+row.names(d_w_chn) <- NULL
+```
+
+
+```{r}
+sales_today = data.frame(value = character())
+for (i in 1:nrow(d_w_chn)){
+  if (is.na(d_w_chn$direct_ib[i])){
+     input_name = d_w_chn$name[i]
+  } else{
+ input_name = d_w_chn$direct_ib[i]}
+ if (input_name %in% sales_man$name){
+    sales_today[nrow(sales_today)+1,] = input_name
+ } else{
+ position = user_information %>% drop_na(superior) %>%  filter(name ==input_name)
+ if (nrow(position) > 1){
+   sales_today[nrow(sales_today)+1,] = "nrwoposition_greater_than_1"
+ } 
+ else if (nrow(position) == 0){
+   sales_today[nrow(sales_today)+1,] = "nrwoposition_equals_0"
+ } else{
+   if (position$superior %in% sales_man$name){
+     sales_today[nrow(sales_today)+1,] = position$superior
+   } else{
+     continue <- TRUE
+     while(continue){
+       input_name  <-  position$superior[1]
+       position <- user_information[user_information$name == input_name, ]
+       if(position$superior %in% sales_man$name){
+         continue <- FALSE
+       }
+     }
+     sales_today[nrow(sales_today)+1,] = position$superior[1]
+   }
+ }
+}
+
+}
+d_w_chn_sales = cbind(d_w_chn, sales_today)
+# d_w_chn_sales = d_w_chn_sales %>%  filter(name!= "刘小红")
+```
+
+```{r}
+temp = d_w_chn_sales %>%
+   filter(d_w_chn_sales$account %in% user_information$acc_number)
+d_w_chn_sales_without_rebate = d_w_chn_sales %>%
+   filter(d_w_chn_sales$account %nin% user_information$acc_number)
+d_w_chn_sales_without_rebate = d_w_chn_sales_without_rebate %>%
+   filter(account != 11968)
+d_w_chn_sales_without_rebate = d_w_chn_sales_without_rebate %>%
+   filter(value !="nrwoposition_equals_0")
+```
+
+```{r}
+output_chn = d_w_chn_sales_without_rebate %>% group_by(value, account) %>% summarise(
+  deposit = sum(deposit),
+  withdrawal = sum(withdrawal)
+) 
+write.xlsx(as.data.frame(output_chn), "KPI_aug_chn.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```

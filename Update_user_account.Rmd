@@ -1,0 +1,85 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+```
+
+```{r startup}
+appURL <- 'https://broker.skyallmarkets.com/'
+username = "client@skyallmarkets.com"
+password = "OperationClient1234"
+rD <- rsDriver(browser = "chrome", port = 5567L, chromever = "92.0.4515.43")
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login and go to account/user/trading}
+remDr$findElement(using = 'css selector', "#userName")$sendKeysToElement(list(username))
+remDr$findElement(using = 'css selector', "#passWord")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#submit")$clickElement()
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#page-header > div.menu__7UixM > ul > li:nth-child(8) > a")$clickElement() # go to account
+# remDr$navigate("https://broker.skyallmarkets.com/usermgmt") # go to user
+remDr$navigate("https://broker.skyallmarkets.com/reportmgmt/reports/HistoryOrder") # go to trading   history
+```
+
+# Update user_information
+```{r update user_information}
+user_acc = getuserlink(1,1,1,12)
+user_link = user_acc
+user_detail_raw = getuserdetailraw(user_link)
+user_detail_format = getuserdetailformat(user_detail_raw)
+temp = rbind(user_detail_format, user_information)
+write.xlsx(user_detail_format, "user_information.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+
+#Update account detail
+```{r update account detail}
+acc_raw5 = read_excel("acc_raw5.xlsx") %>% clean_names()
+new_rows_list = getaccountlink(1,2,1,20)
+new_rows = new_rows_list[[1]]
+add_in = new_rows %>% slice(1:39)
+tteemmpp = new_rows %>% slice(1801:2064)
+raw_list = getaccountdetailraw1(tteemmpp)
+raw1 = raw_list[[1]]
+error = raw_list[[2]]
+again_llist = getaccountdetailraw1(error)
+raw1 = rbind(raw1, again_llist[[1]])
+error_2 = again_llist[[2]]
+again_lllist = getaccountdetailraw1(error_2)
+raw1 = rbind(raw1, again_lllist[[1]])
+write.xlsx(as.data.frame(raw1), "raw1801_2064.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+
+raw2 = getaccountdetailraw2withrole(raw1)
+raw3 = getaccountdetailraw3withsales_new(raw2)
+raw4 = getaccountdetailraw4withtype(raw3)
+raw5 = getaccountdetailraw5withgeo(raw4)
+raw5 = raw5 %>% clean_names()
+acc_raw5 = rbind(raw5, acc_raw5)
+write.xlsx(acc_raw5, "acc_raw5.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+
+```{r add ecn to account detail}
+ecn = data.frame(ecn = character())
+for (i in 1:nrow(acc_raw5)){
+  if (grepl("S-U-0-", acc_raw5$group[i])){
+      ecn[nrow(ecn)+1,] = "ecn"
+  } else{
+    ecn[nrow(ecn)+1,] = NA
+  }
+ 
+}
+acc_raw5_withecn = cbind(acc_raw5, ecn)
+write.xlsx(acc_raw5_withecn, "acc_raw5_withecn.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+

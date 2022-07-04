@@ -1,0 +1,223 @@
+```{r library}
+library(XML)
+library(RSelenium)
+library(tidyverse)
+library(rvest)
+library(htmltools)
+library("xlsx")
+library(readxl)
+library(theoneCRM)
+```
+
+```{r startup}
+appURL <- 'https://broker.skyallmarkets.com/'
+username = "client@skyallmarkets.com"
+password = "OperationClient1234"
+rD <- rsDriver(browser = "chrome", port = 2019L)
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login and go to account/user}
+remDr$findElement(using = 'css selector', "#userName")$sendKeysToElement(list(username))
+remDr$findElement(using = 'css selector', "#passWord")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#submit")$clickElement()
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#page-header > div.menu__7UixM > ul > li:nth-child(8) > a")$clickElement() # go to account
+remDr$navigate("https://broker.skyallmarkets.com/usermgmt") # go to user
+```
+
+```{r get account and link}
+acc = data.frame(value = numeric(), link = character())
+for (j in 1:2){
+for (i in 1:20){
+x = remDr$findElement(using = 'xpath', paste0("//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/table/tbody/tr[", i,"]/td[3]/a"))$getElementText()
+
+y = remDr$findElement(using = 'css selector', paste0("#react-root > div > div > div.lean-layout.page-layout__35AfQ > div > div.lean-layout.page-layout__35AfQ.lean-layout-horizontal > div.lean-layout.page-layout__35AfQ > div.lean-content.layout-content__EsTL9.scrollable-x__1eluV.table__272LF > div > div > table > tbody > tr:nth-child(", i,") > td:nth-child(3) > a"))$getElementAttribute("href")
+acc = rbind(acc, c(x[1], y[1]))
+colnames(acc)[1] <- "acc"
+colnames(acc)[2] <- "link"
+}
+  if (j <96){
+remDr$findElement(using = 'css selector', "#react-root > div > div > div.lean-layout.page-layout__35AfQ > div > div.lean-layout.page-layout__35AfQ.lean-layout-horizontal > div.lean-layout.page-layout__35AfQ > div.lean-content.layout-content__EsTL9.scrollable-x__1eluV.table__272LF > div > div > div > ul > li.lean-pagination-next > a")$clickElement()
+Sys.sleep(2)
+  }
+  else{
+    Sys.sleep(2)
+  }
+}
+write.csv(acc, file = "addon.csv")
+```
+
+```{r get the email}
+email = data.frame(value = character())
+for (i in 1:20){
+remDr$navigate(acc$link[i])
+Sys.sleep(5)
+x = remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[2]/div/div[2]/div[2]/div/span/input")$getElementAttribute("value")
+email = rbind(email, x[[1]])
+remDr$goBack()
+Sys.sleep(2)
+}
+```
+
+```{r get images link}
+images = data.frame(value = character(), name = character())
+for (i in 4:nrow(acc)){
+remDr$navigate(acc$link[i])
+Sys.sleep(5)
+remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/ul/li[4]")$clickElement()
+remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/ul/li[6]")$clickElement()
+
+for (i in 3:9){
+  y = remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[1]/div[2]/div[1]/div/div/div")$getElementText()
+    skip_to_next <- FALSE
+    tryCatch(x <- remDr$findElement(using = 'xpath',
+            paste0('//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/div[4]/div/div[', i, ']/div[2]/div/div/div/div/div/img'))$getElementAttribute("src"), error = function(e) { skip_to_next <<- TRUE}
+)
+    if(skip_to_next) { 
+      images = rbind(images, c(NA, y[[1]]))
+      next}
+    else{
+     images = rbind(images, c(x[[1]], y[[1]]))
+    }
+}
+}
+
+images = rename(images, 'link' = 'X.https...broker.skyallmarkets.com.ali.oss.preview.leanwork.fs.fName.tw.prod.T002642.80cb535c.15ad.4c34.9cf5.f8b713e5fd08.jpg.', 'name' = 'X.Philip.Jefferson.S.Ayban.')
+# write.xlsx(images, "images_1_2.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+
+```{r get detailed information}
+# remDr$refresh()
+detail = data.frame(account = numeric(), name = character(), email = character(), leverage = character(), group = character(), regis_date = character(), direct_IB = character())
+for (i in 21:nrow(acc)){
+  remDr$navigate(acc$link[i])
+  Sys.sleep(4)
+  account <- remDr$findElement(using = 'css selector', "#react-root > div > div > div.lean-layout.page-layout__35AfQ > div > div.lean-header.header__KqcDM > div > div.info__3t6Ti > div > div.detail__1XNhc")$getElementText()[[1]]
+  name = remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[1]/div[2]/div[1]/div/div/div")$getElementText()[[1]]
+  email = remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[2]/div/div[2]/div[2]/div/span/input")$getElementAttribute("value")[[1]]
+  leverage = remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div[1]/div[2]/div/div[2]/div[2]/div/div/div/div/div
+")$getElementText()[[1]]
+  group = remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div[1]/div[2]/div/div[1]/div[2]/div/div/div/div/div")$getElementText()[[1]]
+  regis_date = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[1]/div[10]')$getElementText()[[1]]
+  direct_IB = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[1]/div[1]/div/div/div')$getElementText()[[1]]
+  detail[nrow(detail)+1,] = c(account, name, email, leverage, group, regis_date, direct_IB)
+}
+```
+  
+```{r get users and link}
+user_acc = data.frame(value = character(), link = character())
+error_trace = data.frame(value = numeric())
+for (j in 1:1){
+for (i in 1:3){
+x = remDr$findElement(using = 'xpath', paste0("//*[@id='react-root']/div/div/div[2]/div[2]/div[2]/div[1]/div/div/table/tbody/tr[", i,"]/td[5]/div/div[1]/a"))$getElementText()
+
+y = remDr$findElement(using = 'xpath', paste0("//*[@id='react-root']/div/div/div[2]/div[2]/div[2]/div[1]/div/div/table/tbody/tr[", i,"]/td[5]/div/div[1]/a"))$getElementAttribute("href")
+user_acc = rbind(user_acc, c(x[[1]], y[[1]]))
+colnames(user_acc)[1] <- "user"
+colnames(user_acc)[2] <- "link"
+}
+  if (j < 10){
+    error_trace[nrow(error_trace)+1,] = c(j)
+remDr$findElement(using = 'css selector', "#react-root > div > div > div.lean-layout.page-layout__35AfQ > div.lean-layout.page-layout__35AfQ.lean-layout-horizontal > div.lean-layout.page-layout__35AfQ > div.lean-content.layout-content__EsTL9.scrollable-x__1eluV.table__272LF > div > div > div > ul > li.lean-pagination-next > a")$clickElement()
+Sys.sleep(2)
+  }
+  else{
+    error_trace[nrow(error_trace)+1,] = c(j)
+  }
+}
+
+# write.xlsx(user_acc, "user_acc.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+ 
+```{r get user detail}
+user_acc = getuserlink(1,1,1,3)
+# user_acc = read_excel("user_acc.xlsx")
+user_detail = data.frame(name = character(),  role = character(), level = character(), superior = character(), acc_number = numeric())
+# error_trace = data.frame(value = numeric())
+for (i in 1:nrow(user_acc)){
+  remDr$navigate(user_acc$link[i])
+  Sys.sleep(4)
+  name = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div[2]/div[2]/span/div/div[1]/div[2]/div[1]/div/div[1]/div/div/div[1]/div[3]/div[2]/div/span/input')$getElementAttribute("value")[[1]]
+  role = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div[2]/div[2]/span/div/div[1]/div[2]/div[1]/div/div[1]/div/div/div[1]/div[7]/div[2]/div/div/div/div/div')$getElementText()[[1]]
+  level = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div[2]/div[2]/span/div/div[1]/div[2]/div[1]/div/div[3]/div/div/div/div[1]/div[2]/div/div/div/div')$getElementText()[[1]]
+  superior = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div[2]/div[2]/span/div/div[1]/div[2]/div[1]/div/div[3]/div/div/div/div[2]/div[2]/div/div/div/div')$getElementText()[[1]]
+              skip_to_next <- FALSE
+          tryCatch(acc_number <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div[2]/div[2]/span/div/div[1]/div[2]/div[1]/div/div[4]/div/div/div[3]/div[2]/div[2]/div/div/div/div')$getElementText()[[1]], error = function(e) { skip_to_next <<- TRUE})
+          if(skip_to_next) {
+              user_detail[nrow(user_detail)+1,] = c(name, role, level, superior, NA)
+            next 
+            } 
+  user_detail[nrow(user_detail)+1,] = c(name, role, level, superior, acc_number)
+  # error_trace[nrow(error_trace)+1,] = c(i)
+}
+# new = cbind(user_acc, user_detail)
+# write.xlsx(new, "user_new.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+ 
+ 
+```{r}
+# library(stringi)
+# tt = str_extract_all(user_detail$superior,  "(?<=\\().+?(?=\\))")
+# tt[tt=="character(0)"] <- NA
+# tt = tt %>% unlist() %>% as.data.frame()
+# names(tt)[names(tt) == '.'] <- 'sup_position'
+# user_detail = cbind(user_detail, tt)
+# zz=gsub("\\s*\\([^\\)]+\\)","",user_detail$superior) %>% as.data.frame()
+# colnames(zz) <- "superior"
+# zz = substr(zz$superior,1,nchar(zz$superior)-6) %>% as.data.frame()
+# colnames(zz) <- "superior"
+# user_detail$superior = zz$superior
+# user_detail = cbind(user_detail, user_acc$link)
+# colnames(user_detail)[7] <- "link"
+# column1 = data.frame(Column1 = numeric())
+# for (i in 1:nrow(user_detail)){
+#   temp = stri_trans_general(user_detail$name, "latin-ascii") %>% as.data.frame()
+#   if (!stri_enc_isascii(temp$.[i])){
+#     column1[nrow(column1)+1,] = NA
+#   }
+#   else{
+#     column1[nrow(column1)+1,] = 1
+#   }
+# }
+# user_detail = cbind(user_detail, column1$Column1)
+# colnames(user_detail)[8] <- "Column1"
+# col_order <- c("name", "role", "level", "superior", "sup_position", "Column1", "acc_number", "link")
+# user_detail <- user_detail[, col_order]
+```
+
+ 
+```{r get user account number}
+user_acc = read_excel("user_acc.xlsx")
+account_number_col = data.frame(value = character())
+# user_detail = data.frame(name = character(), role = character(), level = character(), superior = character())
+error_trace = data.frame(value = numeric())
+for (i in 1:nrow(user_acc)){
+  remDr$navigate(user_acc$link[i])
+  Sys.sleep(4)
+  # name = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div[2]/div[2]/span/div/div[1]/div[2]/div[1]/div/div[1]/div/div/div[1]/div[3]/div[2]/div/span/input')$getElementAttribute("value")[[1]]
+  # role = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div[2]/div[2]/span/div/div[1]/div[2]/div[1]/div/div[1]/div/div/div[1]/div[7]/div[2]/div/div/div/div/div')$getElementText()[[1]]
+  # level = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div[2]/div[2]/span/div/div[1]/div[2]/div[1]/div/div[3]/div/div/div/div[1]/div[2]/div/div/div/div')$getElementText()[[1]]
+  # superior = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div[2]/div[2]/span/div/div[1]/div[2]/div[1]/div/div[3]/div/div/div/div[2]/div[2]/div/div/div/div')$getElementText()[[1]]
+  
+            skip_to_next <- FALSE
+          tryCatch(account_number <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div[2]/div[2]/span/div/div[1]/div[2]/div[1]/div/div[4]/div/div/div[3]/div[2]/div[2]/div/div/div/div')$getElementText(), error = function(e) { skip_to_next <<- TRUE})
+          if(skip_to_next) {
+            account_number_col[nrow(account_number_col)+1, ] = NA
+            next 
+            } 
+#  user_detail[nrow(user_detail)+1,] = c(name, role, level, superior)
+  account_number_col[nrow(account_number_col)+1, ] = account_number[[1]]
+  error_trace[nrow(error_trace)+1,] = c(i)
+}
+# new = cbind(user_acc, account_number_col$value)
+# write.xlsx(new, "new_acc_link.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+
+```{r read a table}
+tableElem<- remDr$findElement("css selector", "#react-root > div > div > div.lean-layout.page-layout__35AfQ > div > div.lean-layout.page-layout__35AfQ.lean-layout-horizontal > div.lean-layout.page-layout__35AfQ > div.lean-content.layout-content__EsTL9.scrollable-x__1eluV.table__272LF > div > div > table")
+res <- readHTMLTable(header = TRUE, encoding="UTF-8",tableElem$getElementAttribute("outerHTML")[[1]])
+temp = res[1] %>% as.data.frame()
+```

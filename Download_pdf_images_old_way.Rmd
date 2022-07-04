@@ -1,0 +1,137 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+```
+
+```{r startup}
+appURL <- 'https://broker.skyallmarkets.com/'
+username = "client@skyallmarkets.com"
+password = "OperationClient1234"
+rD <- rsDriver(browser = "chrome", port = 5567L, chromever = "92.0.4515.43")
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login and go to account/user/trading}
+remDr$findElement(using = 'css selector', "#userName")$sendKeysToElement(list(username))
+remDr$findElement(using = 'css selector', "#passWord")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#submit")$clickElement()
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#page-header > div.menu__7UixM > ul > li:nth-child(8) > a")$clickElement() # go to account
+# remDr$navigate("https://broker.skyallmarkets.com/usermgmt") # go to user
+remDr$navigate("https://broker.skyallmarkets.com/reportmgmt/reports/HistoryOrder") # go to trading   history
+```
+
+
+# Image dowloader
+```{r images}
+library(here)
+acc_links = read_excel(here("second_time_raw","acc_links.xlsx"))
+# acc_links = rbind(add_in, acc_links)
+# write.xlsx(acc_links, "acc_links.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+# acc_link_list = getaccountlink(1,2,1,20)
+acc_link = acc_links %>% slice(1:100)
+data = getimagelink(acc_link)
+temp1 = data[[1]]
+data = temp1
+name_list = data %>% select(name) %>% distinct()
+# getimagedownloaded(data)
+```
+
+
+```{r create name folders}
+  # remove.list <- paste(c("[]", NA))
+  data = data %>% filter(!grepl("accountmgmt", data$link)) %>% drop_na(link)
+  # data$name[16:18] = "Charlaine Mendoza" # changeable
+  myurl <- data$link
+  df = data.frame(link = character(), name = character(), row_nb = character())
+
+  name_list = data %>% select(name) %>% distinct()
+  
+
+  dir.create("C:/Users/palac/Documents/Webscraping/images")
+
+  work_dir <- "C:/Users/palac/Documents/Webscraping/images"
+  setwd(work_dir)
+
+  for(i in 1:nrow(name_list)){
+    dir.create(name_list$name[[i]])
+  }
+```
+
+```{r download}
+  work_dir <- "C:/Users/palac/Documents/Webscraping/images"
+  setwd(work_dir)
+  for (i in 1:nrow(data)){
+    setwd(data$name[[i]])
+    z <- tempfile()
+    skip_to_next <- FALSE
+    tryCatch(download.file(myurl[i],z,mode="wb"), error = function(e) { skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      df = rbind(df, data.frame(link = data$link[[i]], name = data$name[[i]], row_nb =paste0("Cannot download ",i)))
+      setwd('..')
+      next
+    }
+    else{
+    }
+    if (str_sub(myurl[i],-3,-1) %in% c("jpg", "peg")){
+      skip_to_next <- FALSE
+      tryCatch(pic <- readJPEG(z), error = function(e) { skip_to_next <<- TRUE})
+      if(skip_to_next) {
+        df = rbind(df, data.frame(link = data$link[[i]], name = data$name[[i]], row_nb = i))
+        print(i)
+        setwd('..')
+        next
+      }
+      else{writeJPEG(pic,paste0("image", i, ".jpg"))
+        print(i)
+      }
+    }
+    else{
+      skip_to_next <- FALSE
+      tryCatch(pic <- readPNG(z), error = function(e) { skip_to_next <<- TRUE})
+      if(skip_to_next) {
+        df = rbind(df, data.frame(link = data$link[[i]], name = data$name[[i]], row_nb = i))
+        print(i)
+        setwd('..')
+        next }
+      else{
+        writePNG(pic,paste0("image", i, ".png"))}
+      print(i)
+    }
+    setwd('..')
+  }
+```
+
+```{r pdf check}
+pdf_acc_count = data.frame(acc = numeric(), pdf_count = numeric())
+for (z in 1:nrow(acc_link)){
+remDr$navigate(acc_link$link[z])
+Sys.sleep(5)
+remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/ul/li[4]")$clickElement()
+remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/ul/li[6]")$clickElement()
+j = 0
+for (i in 3:9){
+  skip_to_next <- FALSE
+  tryCatch(temp <- remDr$findElement(using = 'xpath',
+                    paste0('//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/div[4]/div/div[', i, ']/div[2]/div/div/div/div/div/span[2]'))$getElementText(), error = function(e) { skip_to_next <<- TRUE}
+)
+  if(skip_to_next) {next}
+  if (endsWith(temp[[1]], "f") == TRUE){
+    j = j + 1
+  }
+}
+pdf_acc_count[nrow(pdf_acc_count)+1,] = c(acc_link$acc[z], j)
+}
+```

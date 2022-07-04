@@ -1,0 +1,80 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+# library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+library(here)
+library(stringi)
+```
+
+```{r startup}
+appURL <- 'https://my.skyamarkets.com/SuperAdmin/Clients'
+username = "admin@skyallmarkets.com"
+password = "123temp$"
+rD <- rsDriver(browser = "chrome", port = 5367L, chromever = "100.0.4896.60")
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login and go to account/user/trading}
+remDr$refresh
+remDr$findElement(using = 'id', "username")$sendKeysToElement(list(username))
+remDr$findElement(using = 'id', "password")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'id', "btn-submit")$clickElement()
+Sys.sleep(2)
+```
+
+```{r}
+acc_fdms = read_excel(here("data", "acc_fdms.xlsx")) %>% janitor::clean_names()
+outgoing_funds = read_excel(here("data", "acc_fdms.xlsx"), sheet = "Sheet2") %>% janitor::clean_names()
+```
+
+```{r}
+acc_id = data.frame(id = character(),
+                    acc = numeric())
+for (j in 1:nrow(acc_fdms)){
+  remDr$findElement(using = 'xpath', '//*[@id="gs_PlatformLogin"]')$sendKeysToElement(list(as.character(acc_fdms$acc[j])))
+  remDr$findElement(using = 'xpath', '//*[@id="gs_PlatformLogin"]')$sendKeysToElement(list(key = "enter"))
+  Sys.sleep(5)
+  id = remDr$findElement(using = 'xpath', '//*[@id="1"]/td[2]/a')$getElementText()[[1]]
+  acc = acc_fdms$acc[j]
+  acc_id[nrow(acc_id)+1,] = c(id, acc)
+  for (i in 1:6){
+    remDr$findElement(using = 'xpath', '//*[@id="gs_PlatformLogin"]')$sendKeysToElement(list(key = "backspace"))
+    if (i ==6) break
+  }
+}
+
+```
+
+```{r}
+outgoing_under_fdms = outgoing_funds %>% filter(partner_name == "FDMS Business")
+outgoing_under_fdms_id = stri_sub(outgoing_under_fdms$from_account_number,-6,-1)
+acc_id$id_extracted = stri_sub(acc_id$id,-6,-1)
+who_outgoing = data.frame(id = character(),
+                          acc = character(),
+                          id_extracted = character())
+for (i in 1:length(outgoing_under_fdms_id)){
+  row = acc_id %>% filter(outgoing_under_fdms_id[i] == acc_id$id_extracted)
+  who_outgoing = rbind(who_outgoing, row)
+}
+```
+
+```{r}
+outgoing_under_fdms$id_extracted = stri_sub(outgoing_under_fdms$from_account_number,-6,-1)
+people_outgoing_fdms = outgoing_under_fdms %>% filter(id_extracted %in% who_outgoing$id_extracted)
+people_outgoing_fdms = as.data.frame(people_outgoing_fdms)
+write.xlsx(people_outgoing_fdms, "people_outgoing_fdms.xlsx", 
+           sheetName = "people_outgoing_fdms", 
+           col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+

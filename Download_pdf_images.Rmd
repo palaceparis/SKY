@@ -1,0 +1,132 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+```
+
+```{r startup}
+appURL <- 'https://broker.skyallmarkets.com/'
+username = "client@skyallmarkets.com"
+password = "OperationClient1234"
+rD <- rsDriver(browser = "chrome", port = 5567L, chromever = "92.0.4515.43")
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login and go to account/user/trading}
+remDr$findElement(using = 'css selector', "#userName")$sendKeysToElement(list(username))
+remDr$findElement(using = 'css selector', "#passWord")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#submit")$clickElement()
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#page-header > div.menu__7UixM > ul > li:nth-child(8) > a")$clickElement() # go to account
+# remDr$navigate("https://broker.skyallmarkets.com/usermgmt") # go to user
+remDr$navigate("https://broker.skyallmarkets.com/reportmgmt/reports/HistoryOrder") # go to trading   history
+```
+
+```{r download all (pdf and images)}
+link = remDr$getPageSource()[[1]] %>%
+  read_html() %>%
+  html_nodes(".lean-table-cell a") %>%
+  html_attr('href') %>% 
+  str_c("https://broker.skyallmarkets.com", .)
+acc = remDr$getPageSource()[[1]] %>%
+  read_html() %>%
+  html_nodes(".lean-table-cell a") %>%
+  html_text()
+acc_links = tibble(acc = acc, link = link)
+error_trace = data.frame(acc = character(), link = character())
+# error_trace = error_trace[-c(2:11), ]
+dir.create("F:/Webscraping/images5")
+work_dir <- "F:/Webscraping/images5"
+setwd(work_dir)
+# acc_links = error_trace
+for (i in 1:nrow(acc_links)){
+remDr$navigate(acc_links$link[i])
+Sys.sleep(4)
+
+skip_to_next <- FALSE
+tryCatch(
+  name  <-  remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[1]/div[2]/div[1]/div/div/div')$getElementText()[[1]],
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot find name ",i), link = acc_links$link[i])
+  next} else{}
+
+skip_to_next <- FALSE
+tryCatch(dir.create(name),
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot create name folder ",i), link = acc_links$link[i])
+  next} else{}
+
+skip_to_next <- FALSE
+tryCatch(setwd(name),
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot setwdr ",i), link = acc_links$link[i])
+  next} else{}
+
+skip_to_next <- FALSE
+tryCatch(
+remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/ul/li[4]")$clickElement(),
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot click Client info ",i), link = acc_links$link[i])
+  setwd('..')
+  next} else{}
+
+skip_to_next <- FALSE
+tryCatch(
+remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/ul/li[6]")$clickElement(),
+  error = function(e) { skip_to_next <<- TRUE}
+)
+if(skip_to_next) {
+  error_trace[nrow(error_trace)+1,] = c(acc = paste0("cannot click Doc ",i), link = acc_links$link[i])
+  setwd('..')
+  next} else{}
+
+
+src = remDr$getPageSource()[[1]] %>% 
+  read_html() %>%
+  html_nodes(".lean-upload-container img") %>% 
+  html_attr("src") %>% tibble()
+if (is_empty(src$.)){
+  setwd('..')
+  next
+} else{
+for (i in 1:nrow(as.data.frame(src))){
+  if (identical(substr(src$.[i], 1, 3), "//b")){
+  str_c("https:", src$.[i])%>% 
+  walk2(., basename(.), download.file, mode = "wb",  Sys.sleep(2))
+
+} else{
+  str_c("https://broker.skyallmarkets.com/", src$.[i]) %>% 
+    walk2(., basename(.), download.file, mode = "wb",  Sys.sleep(2))
+  
+}
+  setwd('..')
+}
+  }
+  
+}
+# remDr$navigate("https://broker.skyallmarkets.com/accountmgmt/13029?vendor=MT4&serverId=4011")
+
+
+
+
+# match("12687",acc_links$acc) # get row index
+```

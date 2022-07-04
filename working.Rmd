@@ -1,0 +1,93 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+# library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+library(here)
+library(stringi)
+library(stringr)
+
+```
+
+```{r}
+data = read_csv(here("data", "SummaryReport_20220518003802.csv")) %>% janitor::clean_names()
+```
+
+```{r php}
+data %>% filter(str_sub(sales_admin, start = 1, end=4)=="Mark") %>%
+  filter(category== "Trader") %>%
+  filter(platform_login!="--") %>% 
+  summarise(volume=sum(volume),
+            deposit=sum(deposit),
+            withdraw = sum(withdraw))
+  
+```
+
+```{r china}
+data %>% filter(str_sub(sales_admin, start = 1, end=1) == "杨") %>%
+  filter(category== "Trader") %>%
+  filter(deposit>0|withdraw>0) %>% 
+  summarise(deposit = sum(deposit),
+            withdraw=sum(withdraw))
+
+```
+
+```{r}
+all = read_csv(here("data", "SummaryReport_20220518010538.csv")) %>% janitor::clean_names()
+all %>% filter(str_sub(sales_admin, start = 1, end=1)=="甘") %>%
+  filter(category== "Trader") %>%
+  filter(deposit>0|withdraw!=0) %>% 
+  filter(date=="17/05/2022") %>% 
+  filter(platform_login!="--")
+```
+
+```{r shemi cashi}
+shemi = read_csv(here("data", "SummaryReport_20220519051622.csv")) %>% janitor::clean_names()
+deposit = shemi %>% filter(category=="Trader") %>% filter(sales_admin == "Anne Sabiniano") %>% filter(deposit>0)
+login =  read_excel(here("data", "login.xlsx")) %>% janitor::clean_names()
+
+IB = data.frame(ib = as.character())
+for (i in 1:nrow(deposit)){
+  if (str_sub(deposit$account[i], -5, -1) %in% login$account2){
+    IB[nrow(IB)+1,] = "Shemi"
+  } else{
+    IB[nrow(IB)+1,] = "NONShemi"
+  }
+}
+
+shemi_deposit = cbind(deposit,IB$ib)
+shemi_deposit = shemi_deposit %>% filter(IB$ib=="Shemi")
+output = shemi_deposit %>% filter(platform_login!="--") 
+write.xlsx(output, file = "Shemi_Deposit.xlsx", append=TRUE)
+```
+
+
+```{r}
+shemi_transact  = read_excel(here("data", "tran.xlsx")) %>% janitor::clean_names()
+
+IB = data.frame(ib = as.character())
+for (i in 1:nrow(shemi_transact)){
+  if (str_sub(shemi_transact$to_account_nmuber[i], -5, -1) %in% login$account2){
+    IB[nrow(IB)+1,] = "Shemi"
+  } else{
+    IB[nrow(IB)+1,] = "NONShemi"
+  }
+}
+
+shemi_transact = cbind(shemi_transact,IB$ib)
+shemi_transact = shemi_transact %>% filter(IB$ib == "Shemi") 
+shemi_transact$funding_source[15] ="SkyAlliance PSP"
+shemi_transact = shemi_transact %>% filter(funding_source!="SkyAlliance PSP") 
+write.xlsx(shemi_transact, file = "out.xlsx", append=TRUE)
+
+```
+
+

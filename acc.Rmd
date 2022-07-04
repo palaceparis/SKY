@@ -1,0 +1,59 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+```
+
+```{r startup}
+appURL <- 'https://broker.skyallmarkets.com/'
+username = "client@skyallmarkets.com"
+password = "OperationClient1234"
+rD <- rsDriver(browser = "chrome", port = 4567L, chromever = "92.0.4515.43")
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login and go to account/user/trading}
+remDr$findElement(using = 'css selector', "#userName")$sendKeysToElement(list(username))
+remDr$findElement(using = 'css selector', "#passWord")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#submit")$clickElement()
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#page-header > div.menu__7UixM > ul > li:nth-child(8) > a")$clickElement() # go to account
+```
+
+```{r}
+new_rows_list = getaccountlink(1,104,1,20)
+new_rows = new_rows_list[[1]]
+# acc_link = raw1 %>% slice(1:54)
+tteemmpp = new_rows %>% slice(1801:2064)
+raw_list = getaccountdetailraw1(tteemmpp)
+raw1 = raw_list[[1]]
+error = raw_list[[2]]
+again_llist = getaccountdetailraw1(error)
+raw1 = rbind(raw1, again_llist[[1]])
+error_2 = again_llist[[2]]
+again_lllist = getaccountdetailraw1(error_2)
+raw1 = rbind(raw1, again_lllist[[1]])
+write.xlsx(as.data.frame(raw1), "raw1801_2064.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+
+
+
+
+raw2 = getaccountdetailraw2withrole(raw1)
+raw3 = getaccountdetailraw3withsales_new(raw2)
+raw4 = getaccountdetailraw4withtype(raw3)
+raw5 = getaccountdetailraw5withgeo(raw4)
+raw5 = raw5 %>% clean_names()
+acc_raw5 = rbind(raw5, acc_raw5)
+write.xlsx(acc_raw5, "acc_raw5.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+

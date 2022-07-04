@@ -1,0 +1,63 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+# library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+```
+
+```{r startup}
+appURL <- 'https://my.skyamarkets.com/SuperAdmin/Clients'
+username = "admin@skyallmarkets.com"
+password = "123temp$"
+rD <- rsDriver(browser = "chrome", port = 5267L, chromever = "100.0.4896.60")
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login and go to account/user/trading}
+remDr$refresh
+remDr$findElement(using = 'id', "username")$sendKeysToElement(list(username))
+remDr$findElement(using = 'id', "password")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'id', "btn-submit")$clickElement()
+Sys.sleep(2)
+
+# go to user
+remDr$navigate("https://broker.skyallmarkets.com/usermgmt")
+```
+
+```{r scrape user_information}
+user_acc = data.frame(name = character(),
+                      character())
+page = 10
+for (i in 1:page){
+  link = remDr$getPageSource()[[1]] %>%
+    read_html() %>%
+    html_nodes(".lean-table-popover-edit-label a") %>%
+    html_attr('href') %>% 
+    str_c("https://broker.skyallmarkets.com", .)
+  name = remDr$getPageSource()[[1]] %>%
+    read_html() %>%
+    html_nodes(".lean-table-popover-edit-label a") %>%
+    html_text()
+  temp = tibble(name, link)
+  user_acc = rbind(user_acc, temp)
+  remDr$findElement(using = 'xpath', "//a[normalize-space()='Next Page']")$clickElement()
+  Sys.sleep(3)
+}
+user_link = user_acc
+user_detail_raw = getuserdetailraw(user_link)
+user_detail_format = getuserdetailformat(user_detail_raw)
+temp = rbind(user_detail_format, user_information)
+write.xlsx(user_detail_format, "user_information.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+
+

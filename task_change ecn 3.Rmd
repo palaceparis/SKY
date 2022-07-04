@@ -1,0 +1,180 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library("xlsx")
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+library(here)
+```
+
+```{r login}
+rD <- rsDriver(browser = "chrome", port = 4347L, chromever = "96.0.4664.45")
+remDr <- rD$client
+appURL <- 'https://my.skyamarkets.com/SuperAdmin/Clients'
+remDr$navigate(appURL)
+Sys.sleep(3)
+username = "admin@skyallmarkets.com"
+password = "123temp$"
+remDr$findElement(using = 'xpath', '//*[@id="username"]')$sendKeysToElement(list(username))
+remDr$findElement(using = 'xpath', '//*[@id="password"]')$sendKeysToElement(list(password))
+remDr$findElement(using = 'xpath', '//*[@id="formLogin"]/div[5]/input')$clickElement()
+```
+
+```{r}
+acc = read_excel("acc_ecn.xlsx")
+info_frame = data.frame(acc = numeric(), fee_group = character())
+for (i in 11:nrow(acc)){
+  remDr$findElement(using = 'xpath', "//input[@id='gs_PlatformLogin']")$sendKeysToElement(list(factor(acc$acc[i])))
+  remDr$findElement(using = 'xpath', value  = "//input[@id='gs_PlatformLogin']")$sendKeysToElement(list(key = "enter"))
+  Sys.sleep(3)
+  
+  fee_group = remDr$findElement(using = 'css selector',
+                        value = "td[aria-describedby='tblAccounts_FeeGroup']")$
+        getElementText()[[1]]
+  info_frame[nrow(info_frame)+1,] = c(acc$acc[i], fee_group)
+  remDr$navigate(appURL)
+  Sys.sleep(3)
+  remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpCategory_chzn"]/a/span')$clickElement() 
+  remDr$findElement(using = 'xpath', '//*[@id="drpCategory_chzn"]/div/div/input')$sendKeysToElement(list("acc"))
+  remDr$findElement(using = 'xpath', value  = '//*[@id="drpCategory_chzn"]/div/div/input')$sendKeysToElement(list(key = "enter"))
+  Sys.sleep(3)  
+}
+new_acc = info_frame %>% filter(fee_group!="CHN-ECN-3")
+```
+
+```{r}
+# credit = data.frame(acc = numeric())
+# alert = data.frame(acc = numeric(), info = character())
+done = data.frame(acc = numeric())
+for (i in 26:46){
+  remDr$navigate(appURL)
+  Sys.sleep(3)
+  remDr$findElement(using = 'xpath',
+                      value = '//*[@id="drpCategory_chzn"]/a/span')$clickElement() 
+  remDr$findElement(using = 'xpath', '//*[@id="drpCategory_chzn"]/div/div/input')$sendKeysToElement(list("acc"))
+  remDr$findElement(using = 'xpath', value  = '//*[@id="drpCategory_chzn"]/div/div/input')$sendKeysToElement(list(key = "enter"))
+  Sys.sleep(3)
+  remDr$findElement(using = 'xpath', "//input[@id='gs_PlatformLogin']")$sendKeysToElement(list(factor(new_acc$acc[i])))
+  remDr$findElement(using = 'xpath', value  = "//input[@id='gs_PlatformLogin']")$sendKeysToElement(list(key = "enter"))
+  Sys.sleep(3)  
+  remDr$findElement(using = 'xpath',
+                      value = '//*[@id="1"]/td[2]/a')$
+    clickElement()
+  Sys.sleep(3)
+
+  remDr$findElement(using = 'xpath',
+                    value = '/html/body/div[1]/div[1]/div/div[1]/ul/li/div/button')$clickElement()
+  Sys.sleep(3)
+  remDr$findElement(using = 'xpath',
+                    value = '/html/body/div[1]/div[11]/div[2]/ul/li/table/tbody/tr[1]/td[2]/input')$clickElement()
+  remDr$findElement(using = 'xpath',
+                    value = '/html/body/div[1]/div[11]/div[2]/ul/li/table/tbody/tr[2]/td[3]/input')$clickElement()
+  remDr$findElement(using = 'xpath',
+                    value = '/html/body/div[1]/div[11]/div[2]/ul/li/table/tbody/tr[3]/td[2]/input')$clickElement()
+  remDr$findElement(using = 'xpath',
+                    value = '//*[@id="modalAccountSettings"]/div[3]/button[2]')$clickElement()
+  Sys.sleep(4)
+
+
+  remDr$findElement(using = 'xpath',
+                    value = '/html/body/div[1]/div[1]/div/div[1]/h1/span/a[2]')$clickElement()
+  Sys.sleep(3)
+  
+  alertt = remDr$findElement(using = 'xpath',
+                    value = '//*[@id="userDisabledAllert"]')$getElementText()[[1]]
+  alert[nrow(alert)+1,]=c(new_acc$acc[i], alertt)
+  Sys.sleep(3)
+  remDr$findElement(using = 'xpath',
+                    value = '/html/body/div[1]/div[1]/aside/nav/ul/li[3]/a/strong')$clickElement()
+  Sys.sleep(3)
+  
+#####################
+
+a = remDr$getPageSource()[[1]] %>%
+    read_html() %>%
+    html_table(fill=TRUE)
+   index = which(a[[2]]$X4 == new_acc$acc[i])
+if (a[[2]]$X6[index] == 0){
+  remDr$findElement(using = 'xpath',
+                    value = paste0("/html/body/div[1]/div[1]/div/div[2]/article/div[2]/div[3]/div[3]/div/table/tbody/tr[",index,"]/td[11]/div/a"))$clickElement()
+  remDr$findElement(using = 'xpath', 
+                    value = paste0("/html/body/div[1]/div[1]/div/div[2]/article/div[2]/div[3]/div[3]/div/table/tbody/tr[",index,"]/td[11]/div/div/div/input"))$sendKeysToElement(list("chn-ecn-3"))
+    remDr$findElement(using = 'xpath', value  = paste0("/html/body/div[1]/div[1]/div/div[2]/article/div[2]/div[3]/div[3]/div/table/tbody/tr[",index,"]/td[11]/div/div/div/input"))$sendKeysToElement(list(key = "enter"))
+    Sys.sleep(3)
+  remDr$findElement(using = 'xpath',
+                    value = '/html/body/div[1]/div[3]/div[3]/ul/li/input')$clickElement()    
+    remDr$findElement(using = 'xpath', value  = '/html/body/div[1]/div[3]/div[3]/ul/li/input')$sendKeysToElement(list("123temp$"))
+    remDr$findElement(using = 'xpath',
+                      value = '//*[@id="btnSubmitFeeGrp"]')$clickElement()
+    Sys.sleep(4)
+    done[nrow(done)+1,]=new_acc$acc[i]
+   } else{
+  credit[nrow(credit)+1,]=new_acc$acc[i]
+}
+}
+
+```
+
+
+
+```{r}
+
+remDr$findElement(using = 'xpath', "//input[@id='gs_PlatformLogin']")$sendKeysToElement(list(factor(acc$acc[1])))
+remDr$findElement(using = 'xpath', value  = "//input[@id='gs_PlatformLogin']")$sendKeysToElement(list(key = "enter"))
+Sys.sleep(3)
+
+fee_group = remDr$findElement(using = 'css selector',
+                      value = "td[aria-describedby='tblAccounts_FeeGroup']")$
+      getElementText()[[1]]
+# if(fee_group != "CHN-ECN-3"){
+#   
+#   remDr$findElement(using = 'xpath',
+#                       value = '//*[@id="1"]/td[2]/a')$
+#     clickElement()
+#   Sys.sleep(3)
+#   
+#   remDr$findElement(using = 'xpath',
+#                     value = '/html/body/div[1]/div[1]/div/div[1]/ul/li/div/button')$clickElement()  
+#   Sys.sleep(3)
+#   remDr$findElement(using = 'xpath',
+#                     value = '/html/body/div[1]/div[11]/div[2]/ul/li/table/tbody/tr[1]/td[2]/input')$clickElement()
+#   remDr$findElement(using = 'xpath',
+#                     value = '/html/body/div[1]/div[11]/div[2]/ul/li/table/tbody/tr[2]/td[3]/input')$clickElement()
+#   remDr$findElement(using = 'xpath',
+#                     value = '/html/body/div[1]/div[11]/div[2]/ul/li/table/tbody/tr[3]/td[2]/input')$clickElement() 
+#   remDr$findElement(using = 'xpath',
+#                     value = '//*[@id="modalAccountSettings"]/div[3]/button[2]')$clickElement()   
+#   Sys.sleep(4)
+#   
+#   remDr$findElement(using = 'xpath',
+#                     value = '/html/body/div[1]/div[1]/div/div[1]/h1/span/a[2]')$clickElement()  
+#   Sys.sleep(3)
+#   remDr$findElement(using = 'xpath',
+#                     value = '/html/body/div[1]/div[1]/aside/nav/ul/li[3]/a/strong')$clickElement()  
+#   Sys.sleep(3)
+#   remDr$findElement(using = 'xpath',
+#                     value = '/html/body/div[1]/div[1]/div/div[2]/article/div[2]/div[3]/div[3]/div/table/tbody/tr[2]/td[11]/div/a')$clickElement()   
+#   remDr$findElement(using = 'xpath', '/html/body/div[1]/div[1]/div/div[2]/article/div[2]/div[3]/div[3]/div/table/tbody/tr[2]/td[11]/div/div/div/input')$sendKeysToElement(list("ch"))
+#   remDr$findElement(using = 'xpath', value  = '/html/body/div[1]/div[1]/div/div[2]/article/div[2]/div[3]/div[3]/div/table/tbody/tr[2]/td[11]/div/div/div/input')$sendKeysToElement(list(key = "enter"))
+#   
+#   remDr$findElement(using = 'xpath', value  = '//*[@id="txtPassword"]')$sendKeysToElement(list("123temp$"))
+#   remDr$findElement(using = 'xpath',
+#                     value = '//*[@id="btnSubmitFeeGrp"]')$clickElement()
+#   Sys.sleep(4)
+# }
+info_frame = data.frame(acc = numeric(), fee_group = character())
+info_frame[nrow(info_frame)+1,] = c(acc$acc[1], fee_group)
+
+remDr$navigate(appURL)
+Sys.sleep(3)
+remDr$findElement(using = 'xpath',
+                    value = '//*[@id="drpCategory_chzn"]/a/span')$clickElement() 
+remDr$findElement(using = 'xpath', '//*[@id="drpCategory_chzn"]/div/div/input')$sendKeysToElement(list("acc"))
+remDr$findElement(using = 'xpath', value  = '//*[@id="drpCategory_chzn"]/div/div/input')$sendKeysToElement(list(key = "enter"))
+Sys.sleep(3)
+```
+

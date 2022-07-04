@@ -1,0 +1,444 @@
+```{r library, warning=FALSE, message=FALSE}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+```
+
+```{r startup}
+appURL <- 'https://broker.skyallmarkets.com/'
+username = "client@skyallmarkets.com"
+password = "OperationClient1234"
+rD <- rsDriver(browser = "chrome", port = 4567L, chromever = "92.0.4515.43")
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login and go to account/user/trading}
+remDr$findElement(using = 'css selector', "#userName")$sendKeysToElement(list(username))
+remDr$findElement(using = 'css selector', "#passWord")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#submit")$clickElement()
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#page-header > div.menu__7UixM > ul > li:nth-child(8) > a")$clickElement() # go to account
+```
+
+
+```{r}
+account = read_excel("task_acc_temp.xlsx")
+```
+
+```{r link}
+info = data.frame(acc = numeric(),
+                  link = character())
+for (i in 1:11){
+  remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div[3]/div[2]/span/span/input')$sendKeysToElement(list(as.character(name$acc[i])))
+  remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div[3]/div[2]/span/span/input')$sendKeysToElement(list(key = "enter"))
+  
+  Sys.sleep(3)
+  
+  link = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/table/tbody/tr[1]/td[3]/a')$getElementAttribute("href")[[1]]
+  info[nrow(info)+1,] = c(account$acc[i], link)
+  remDr$refresh()
+  
+  Sys.sleep(7)
+}
+```
+
+```{r}
+remDr$navigate(info$link[1])
+Sys.sleep(4)
+# name = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[1]/div[2]/div[1]/div/div/div')$getElementText()[[1]]
+# group = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[1]/div[2]/div/div[1]/div[2]/div/div/div/div/div')$getElementText()[[1]]
+# phone = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[2]/div/div[1]/div[2]/div/div/div[2]/span/input')$getElementAttribute("value")[[1]]
+# email = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[2]/div/div[2]/div[2]/div/span/input')$getElementAttribute("value")[[1]]
+# regis_date = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[2]/div/div[2]/div[2]/div/span/input')$getElementAttribute("value")[[1]]
+
+test = getaccountdetailraw1(info)  
+raw1 = test[[1]]
+  
+```
+
+# Task put things into CB
+
+## ch
+```{r}
+# live-trading / partner-ib
+# appURL <- 'https://my.skyallmarkets.com/account/live'
+appURL <- 'https://my.skyallmarkets.com/account/partner'
+
+remDr$navigate(appURL)
+```
+
+```{r 1}
+# preferred lang-china
+remDr$findElement(using = 'xpath', '//*[@id="language"]/option[13]')$clickElement()
+
+# trader
+remDr$findElement(using = 'xpath', '//*[@id="account"]/option[2]')$clickElement()
+
+# individual
+remDr$findElement(using = 'xpath', '//*[@id="drpClassType"]/option[2]')$clickElement()
+
+# china
+remDr$findElement(using = 'xpath', '//*[@id="residenceCountry"]/option[45]')$clickElement()
+
+
+remDr$findElement(using = 'xpath', '//*[@id="telNumberCountryCode"]')$sendKeysToElement(list("86"))
+
+```
+
+
+```{r 2}
+remDr$findElement(using = 'xpath', '//*[@id="Password"]')$sendKeysToElement(list("1234Abcd"))
+remDr$findElement(using = 'xpath', '//*[@id="ConfirmPassword"]')$sendKeysToElement(list("1234Abcd"))
+remDr$findElement(using = 'xpath', '//*[@id="PhoneID"]')$sendKeysToElement(list("1234Abcd"))
+# 177
+remDr$findElement(using = 'xpath', '//*[@id="citizenship"]/option[45]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="residenceCountry"]/option[45]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="drpEmpStatusID"]/option[2]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="txtEmpIndustry"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="txtOccupation"]')$sendKeysToElement(list("auto"))
+
+remDr$findElement(using = 'xpath', '//*[@id="drpResidenceCountry"]/option[45]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="txtTaxNumber"]')$sendKeysToElement(list("00"))
+
+
+remDr$findElement(using = 'xpath', '/html/body/div[2]/div/form/div/div/div/div/div[3]/div[2]/div[2]/fieldset/select/option[45]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="ResidentialCity"]')$sendKeysToElement(list("auto"))
+
+remDr$findElement(using = 'xpath', '//*[@id="previousAddLine1"]')$sendKeysToElement(list("auto"))
+
+remDr$findElement(using = 'xpath', '//*[@id="previousAddLine2"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="previousCity"]')$sendKeysToElement(list("auto"))
+
+remDr$findElement(using = 'xpath', '//*[@id="previousCountry"]/option[45]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="telNumberCountryCode"]')$sendKeysToElement(list("00"))
+remDr$findElement(using = 'xpath', '//*[@id="mobileNumberCountryCode"]')$sendKeysToElement(list("00"))
+remDr$findElement(using = 'xpath', '//*[@id="mobileNumber"]')$sendKeysToElement(list("00"))
+# remDr$findElement(using = 'name', 'Email')$sendKeysToElement(list("auto@auto.com"))
+# remDr$findElement(using = 'name', 'ConfirmEmail')$sendKeysToElement(list("auto@auto.com"))
+remDr$findElement(using = 'xpath', '//*[@id="estimatedAnnualIncome"]/option[5]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="liquidAssets"]/option[5]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="AvailableTradingCapital"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="AnticipatedInitialDeposit"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="drpInvestmentObj"]/option[2]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpFundSource"]/option[2]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpHaveExpSpot"]/option[2]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpHaveExpShares"]/option[2]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpHaveExpFutures"]/option[2]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpHaveExpTradingOptions"]/option[2]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpTradingStyle"]/option[2]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="HaveAccWithFqSecuritiesNo"]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="RequiredToBeRegisteredWithRegulatorNo"]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="DeclaredBankruptcyNo"]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="RegisteredPersonNo"]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="EmployeeOfExchangeOrRegulatorOperatorNo"]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="EmployeeOfExchangeOrRegulatorOperatorNo"]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="EmployedFinancialSectorNo"]')$clickElement()
+
+
+remDr$findElement(using = 'xpath', '/html/body/div[2]/div/form/div/div/div/div/div[4]/div[3]/div[2]/fieldset/select/option[45]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="drpFullTimeEmployees"]/option[7]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="PrimaryActivitiesPlace"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="drpClientNumber"]/option[6]')$clickElement()
+remDr$findElement(using = 'xpath', '/html/body/div[2]/div/form/div/div/div/div/div[9]/div[1]/div[2]/fieldset/select/option[1]')$clickElement()
+remDr$findElement(using = 'xpath', '/html/body/div[2]/div/form/div/div/div/div/div[9]/div[1]/div[3]/fieldset/select/option[6]')$clickElement()
+remDr$findElement(using = 'xpath', '/html/body/div[2]/div/form/div/div/div/div/div[9]/div[1]/div[4]/fieldset/select/option[1]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="ExpectedNewClientsNumber"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="AvgClientDeposit"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="AvgTradingVol"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="div-step-2-individual"]/div/div/div[10]/div[2]/div/fieldset/label[2]')$clickElement()
+```
+
+## phi
+
+```{r}
+# live / partner
+appURL <- 'https://my.skyallmarkets.com/account/partner'
+remDr$navigate(appURL)
+```
+
+```{r 1}
+# preferred lang-china
+remDr$findElement(using = 'xpath', '//*[@id="language"]/option[21]')$clickElement()
+
+# trader
+remDr$findElement(using = 'xpath', '//*[@id="account"]/option[2]')$clickElement()
+
+# individual
+remDr$findElement(using = 'xpath', '//*[@id="drpClassType"]/option[2]')$clickElement()
+
+# china
+remDr$findElement(using = 'xpath', '//*[@id="residenceCountry"]/option[177]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="telNumberCountryCode"]')$sendKeysToElement(list("63"))
+```
+
+
+```{r 2}
+remDr$findElement(using = 'xpath', '//*[@id="Password"]')$sendKeysToElement(list("1234Abcd"))
+remDr$findElement(using = 'xpath', '//*[@id="ConfirmPassword"]')$sendKeysToElement(list("1234Abcd"))
+remDr$findElement(using = 'xpath', '//*[@id="PhoneID"]')$sendKeysToElement(list("1234Abcd"))
+# 177
+remDr$findElement(using = 'xpath', '//*[@id="citizenship"]/option[177]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="residenceCountry"]/option[177]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="drpEmpStatusID"]/option[2]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="txtEmpIndustry"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="txtOccupation"]')$sendKeysToElement(list("auto"))
+
+remDr$findElement(using = 'xpath', '//*[@id="drpResidenceCountry"]/option[177]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="txtTaxNumber"]')$sendKeysToElement(list("00"))
+
+
+remDr$findElement(using = 'xpath', '/html/body/div[2]/div/form/div/div/div/div/div[3]/div[2]/div[2]/fieldset/select/option[177]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="ResidentialCity"]')$sendKeysToElement(list("auto"))
+
+remDr$findElement(using = 'xpath', '//*[@id="previousAddLine1"]')$sendKeysToElement(list("auto"))
+
+remDr$findElement(using = 'xpath', '//*[@id="previousAddLine2"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="previousCity"]')$sendKeysToElement(list("auto"))
+
+remDr$findElement(using = 'xpath', '//*[@id="previousCountry"]/option[177]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="telNumberCountryCode"]')$sendKeysToElement(list("00"))
+remDr$findElement(using = 'xpath', '//*[@id="mobileNumberCountryCode"]')$sendKeysToElement(list("00"))
+remDr$findElement(using = 'xpath', '//*[@id="mobileNumber"]')$sendKeysToElement(list("00"))
+# remDr$findElement(using = 'name', 'Email')$sendKeysToElement(list("auto@auto.com"))
+# remDr$findElement(using = 'name', 'ConfirmEmail')$sendKeysToElement(list("auto@auto.com"))
+remDr$findElement(using = 'xpath', '//*[@id="estimatedAnnualIncome"]/option[5]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="liquidAssets"]/option[5]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="AvailableTradingCapital"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="AnticipatedInitialDeposit"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="drpInvestmentObj"]/option[2]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpFundSource"]/option[2]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpHaveExpSpot"]/option[2]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpHaveExpShares"]/option[2]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpHaveExpFutures"]/option[2]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpHaveExpTradingOptions"]/option[2]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpTradingStyle"]/option[2]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="HaveAccWithFqSecuritiesNo"]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="RequiredToBeRegisteredWithRegulatorNo"]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="DeclaredBankruptcyNo"]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="RegisteredPersonNo"]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="EmployeeOfExchangeOrRegulatorOperatorNo"]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="EmployeeOfExchangeOrRegulatorOperatorNo"]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="EmployedFinancialSectorNo"]')$clickElement()
+
+
+remDr$findElement(using = 'xpath', '/html/body/div[2]/div/form/div/div/div/div/div[4]/div[3]/div[2]/fieldset/select/option[177]')$clickElement()
+
+# remDr$findElement(using = 'xpath', '//*[@id="drpFullTimeEmployees"]/option[7]')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="PrimaryActivitiesPlace"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="drpClientNumber"]/option[6]')$clickElement()
+remDr$findElement(using = 'xpath', '/html/body/div[2]/div/form/div/div/div/div/div[9]/div[1]/div[2]/fieldset/select/option[1]')$clickElement()
+remDr$findElement(using = 'xpath', '/html/body/div[2]/div/form/div/div/div/div/div[9]/div[1]/div[3]/fieldset/select/option[6]')$clickElement()
+remDr$findElement(using = 'xpath', '/html/body/div[2]/div/form/div/div/div/div/div[9]/div[1]/div[4]/fieldset/select/option[1]')$clickElement()
+
+remDr$findElement(using = 'xpath', '//*[@id="ExpectedNewClientsNumber"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="AvgClientDeposit"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="AvgTradingVol"]')$sendKeysToElement(list("auto"))
+remDr$findElement(using = 'xpath', '//*[@id="div-step-2-individual"]/div/div/div[10]/div[2]/div/fieldset/label[2]')$clickElement()
+```
+
+# new 
+
+```{r read file}
+account = read_excel("task_acc_temp.xlsx")
+
+info = data.frame(acc = numeric(),
+                  link = character())
+for (i in 1:2){
+  remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div[3]/div[2]/span/span/input')$sendKeysToElement(list(as.character(name$acc[i])))
+  remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div[3]/div[2]/span/span/input')$sendKeysToElement(list(key = "enter"))
+  
+  Sys.sleep(3)
+  
+  link = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/table/tbody/tr[1]/td[3]/a')$getElementAttribute("href")[[1]]
+  info[nrow(info)+1,] = c(account$acc[i], link)
+  remDr$refresh()
+  
+  Sys.sleep(7)
+}
+
+```
+
+```{r}
+acc = info
+ detail = data.frame(account = numeric(),
+                      name = character(),
+                      email = character(),
+                      leverage = character(),
+                      group = character(),
+                      regis_date = character(),
+                      direct_IB = character(),
+                      phone = character(),
+                     gender = character(),
+                     birthdate = character(),
+                     adress = character(),
+                     bank_name = character(),
+                     bank_acc = character())
+  error_trace = data.frame(acc = character(), link = character())
+  for (i in 1:nrow(acc)){
+    skip_to_next <- FALSE
+    tryCatch(remDr$navigate(acc$link[i]), error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row link ",i), link = acc$link[i])
+      next
+      }
+    else{}
+    Sys.sleep(4)
+
+    skip_to_next <- FALSE
+    tryCatch(
+      account <- remDr$findElement(using = 'css selector', "#react-root > div > div > div.lean-layout.page-layout__35AfQ > div > div.lean-header.header__KqcDM > div > div.info__3t6Ti > div > div.detail__1XNhc")$getElementText()[[1]]
+      , error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row account ",i), link = acc$link[i])
+      next
+    }
+    else{}
+
+    skip_to_next <- FALSE
+    tryCatch(
+      name <- remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[1]/div[2]/div[1]/div/div/div")$getElementText()[[1]]
+      , error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row name ",i), link = acc$link[i])
+      next
+    }
+    else{}
+
+    skip_to_next <- FALSE
+    tryCatch(
+      email <- remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[2]/div/div[2]/div[2]/div/span/input")$getElementAttribute("value")[[1]]
+      , error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row email ",i), link = acc$link[i])
+      next
+    }
+    else{}
+
+    skip_to_next <- FALSE
+    tryCatch(
+      leverage <- remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div[1]/div[2]/div/div[2]/div[2]/div/div/div/div/div
+")$getElementText()[[1]], error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row leverage ",i), link = acc$link[i])
+      next
+    }
+    else{}
+
+    skip_to_next <- FALSE
+    tryCatch(
+      group <- remDr$findElement(using = 'xpath', "//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div[1]/div[2]/div/div[1]/div[2]/div/div/div/div/div")$getElementText()[[1]]
+      , error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row group ",i), link = acc$link[i])
+      next
+    }
+    else{}
+
+    skip_to_next <- FALSE
+    tryCatch(
+      regis_date <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[1]/div[10]')$getElementText()[[1]]
+      , error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row regis_date ",i), link = acc$link[i])
+      next
+    }
+    else{}
+
+    skip_to_next <- FALSE
+    tryCatch(
+      direct_IB <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[1]/div[1]/div/div/div')$getElementText()[[1]]
+      , error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row direct_IB ",i), link = acc$link[i])
+      next
+    }
+    else{}
+
+    skip_to_next <- FALSE
+    tryCatch(
+      phone <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[2]/div/div[1]/div[2]/div/div/div[2]/span/input')$getElementAttribute("value")[[1]]
+      , error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row phone ",i), link = acc$link[i])
+      next
+    }
+    else{}
+    
+    remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/ul/li[4]')$clickElement()
+    
+    skip_to_next <- FALSE
+    tryCatch(
+      gender <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/div[2]/div/div[2]/div[2]/div/div/div/div/div')$getElementText()[[1]]
+      , error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row gender ",i), link = acc$link[i])
+      next
+    } else{}
+    
+    skip_to_next <- FALSE
+    tryCatch(
+      birthdate <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/div[2]/div/div[3]/div[2]/div/span/div/input')$getElementAttribute("value")[[1]]
+      , error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row birthdate ",i), link = acc$link[i])
+      next
+    }
+    else{}
+    
+      skip_to_next <- FALSE
+    tryCatch(
+      adress <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/div[2]/div/div[9]/div[2]/div/span/input')$getElementAttribute("value")[[1]]
+      , error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row adress ",i), link = acc$link[i])
+      next
+    }
+    else{}
+
+    skip_to_next <- FALSE
+    tryCatch(
+      bank_name <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/div[3]/div/div[10]/div[2]/div/div/div/span/input')$getElementAttribute("value")[[1]]
+      , error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row bank_name ",i), link = acc$link[i])
+      next
+    }
+    else{}
+            
+    skip_to_next <- FALSE
+    tryCatch(
+      bank_acc <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[2]/div/div/div/div[2]/div[3]/div/div[12]/div[2]/div/span/input')$getElementAttribute("value")[[1]]
+      , error = function(e) {skip_to_next <<- TRUE})
+    if(skip_to_next) {
+      error_trace[nrow(error_trace)+1,] = c(paste0("Have a look at row bank_acc ",i), link = acc$link[i])
+      next
+    }
+    else{}
+      detail[nrow(detail)+1,] = c(account, name, email, leverage, group, regis_date, direct_IB, phone, gender, birthdate, adress, bank_name, bank_acc)
+}
+```
+
+

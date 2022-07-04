@@ -1,0 +1,217 @@
+```{r library}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(theoneCRM)
+library(janitor)
+```
+
+```{r}
+raw = read_excel("chnjuly.xlsx") %>% clean_names()
+raw_used <- raw %>% filter(direct_ib != "Total" | is.na(direct_ib))
+```
+
+# CHN
+```{r}
+library(stringi)
+column2 = data.frame(Column1 = numeric())
+temp = stri_trans_general(raw_used$name, "latin-ascii") %>% as.data.frame()
+for (i in 1:nrow(temp)){
+if (!stri_enc_isascii(temp$.[i])){
+column2[nrow(column2)+1,] = NA
+}  else{
+column2[nrow(column2)+1,] = 1
+}
+}
+raw_used = cbind(raw_used, column2)
+chn = raw_used %>% filter(is.na(Column1))
+chn = chn %>% select(-Column1)
+d_w_chn = getKPIdw(chn)
+row.names(d_w_chn) <- NULL
+```
+
+```{r}
+   sales_today = data.frame(value = character())
+   for (i in 1:nrow(d_w_chn)){
+      if (is.na(d_w_chn$direct_ib[i])){
+         input_name = d_w_chn$name[i]
+      } else{
+     input_name = d_w_chn$direct_ib[i]}
+     if (input_name %in% sales_man$name){
+        sales_today[nrow(sales_today)+1,] = input_name
+     } else{
+     position = user_information %>% drop_na(superior) %>%  filter(name ==input_name)
+     if (nrow(position) > 1){
+       sales_today[nrow(sales_today)+1,] = "nrwoposition_greater_than_1"
+     } 
+     else if (nrow(position) == 0){
+       sales_today[nrow(sales_today)+1,] = "nrwoposition_equals_0"
+     } else{
+       if (position$superior %in% sales_man$name){
+         sales_today[nrow(sales_today)+1,] = position$superior
+       } else{
+         continue <- TRUE
+         while(continue){
+           input_name  <-  position$superior[1]
+           position <- user_information[user_information$name == input_name, ]
+           if(position$superior %in% sales_man$name){
+             continue <- FALSE
+           }
+         }
+         sales_today[nrow(sales_today)+1,] = position$superior[1]
+       }
+     }
+   }
+
+}
+d_w_chn_sales = cbind(d_w_chn, sales_today)
+d_w_chn_sales = d_w_chn_sales %>%  filter(name!= "刘小红")
+```
+
+```{r}
+library(Hmisc)
+temp = d_w_chn_sales %>% filter(d_w_chn_sales$account %in% user_information$acc_number)
+back_row = temp %>% filter(comment == "d-00ZJWO-20210719184947220505")
+d_w_chn_sales_without_rebate = d_w_chn_sales %>% filter(d_w_chn_sales$account %nin% user_information$acc_number)
+d_w_chn_sales_without_rebate = rbind(back_row, d_w_chn_sales_without_rebate)
+```
+
+```{r}
+output_chn = d_w_chn_sales_without_rebate %>% group_by(value, account) %>% summarise(
+  deposit = sum(deposit),
+  withdrawal = sum(withdrawal)
+) 
+
+write.xlsx(as.data.frame(output_chn), "output3.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```
+
+
+# PHP
+```{r}
+php = raw_used %>% filter(!is.na(Column1))
+php = php %>% select(-Column1)
+d_w_php = getKPIdw(php)
+row.names(d_w_php) <- NULL
+```
+
+```{r}
+   sales_today = data.frame(value = character())
+   for (i in 1:nrow(d_w_php)){
+      if (is.na(d_w_php$direct_ib[i])){
+         input_name = d_w_php$name[i]
+      } else{
+     input_name = d_w_php$direct_ib[i]}
+     if (input_name %in% sales_man$name){
+        sales_today[nrow(sales_today)+1,] = input_name
+     } else{
+     position = user_information %>% drop_na(superior) %>%  filter(name ==input_name)
+     if (nrow(position) > 1){
+       sales_today[nrow(sales_today)+1,] = "nrwoposition_greater_than_1"
+     } 
+     else if (nrow(position) == 0){
+       sales_today[nrow(sales_today)+1,] = "nrwoposition_equals_0"
+     } else{
+       if (position$superior %in% sales_man$name){
+         sales_today[nrow(sales_today)+1,] = position$superior
+       } else{
+         continue <- TRUE
+         while(continue){
+           input_name  <-  position$superior[1]
+           position <- user_information[user_information$name == input_name, ]
+           if(position$superior %in% sales_man$name){
+             continue <- FALSE
+           }
+         }
+         sales_today[nrow(sales_today)+1,] = position$superior[1]
+       }
+     }
+   }
+
+}
+ d_w_php_sales = cbind(d_w_php, sales_today)
+ d_w_php_sales = d_w_php_sales[- grep("-t-", d_w_php_sales$comment),]
+ d_w_php_sales = d_w_php_sales[- grep("Test", d_w_php_sales$name),]
+```
+
+```{r}
+library(Hmisc)
+d_w_php_sales_without_rebate = d_w_php_sales %>% filter(d_w_php_sales$account %nin% user_information$acc_number)
+
+temp = d_w_php_sales %>% filter(d_w_php_sales$account %in% user_information$acc_number)
+```
+
+```{r}
+table(d_w_php_sales_without_rebate$value) %>% as.data.frame()
+```
+
+```{r}
+check_d_w = d_w_php_sales_without_rebate %>% filter(value == "nrwoposition_greater_than_1")
+d_w_left = d_w_php_sales_without_rebate %>% filter(value != "nrwoposition_greater_than_1")
+```
+
+```{r}
+acc_raw4 = read_excel("acc_raw4.xlsx")
+sales_today = data.frame(direct_ib = character())
+for (i in 1:nrow(check_d_w)){
+   input_name = check_d_w$direct_ib[i]
+   input_accnumber = check_d_w$account[i]
+   account_position = acc_raw4 %>% filter(account == input_accnumber)
+   if (nrow(account_position)!=0){
+   userinfo_position = user_information %>% filter(name == input_name) %>% filter(role == account_position$role)
+      if (nrow(userinfo_position)==0){
+         sales_today[nrow(sales_today)+1,] = "CHECK user_info = 0"
+      } else{
+         if(userinfo_position$name %in% sales_man$name){
+         sales_today[nrow(sales_today)+1,] = userinfo_position$name
+      } else{
+         if (is.na(userinfo_position$superior[1])){
+         sales_today[nrow(sales_today)+1,] = "CHECK superior na"
+         } else{
+            if (userinfo_position$superior %in% sales_man$name){
+               sales_today[nrow(sales_today)+1,] = userinfo_position$superior
+            } else{
+                  continue <- TRUE
+                  while(continue){
+                    input_name  <-  userinfo_position$superior
+                    userinfo_position <- user_information[user_information$name == input_name, ]
+                    if(userinfo_position$superior %in% sales_man$name){
+                      continue <- FALSE
+                    }
+                  }
+                  sales_today[nrow(sales_today)+1,] = userinfo_position$superior
+            }
+            }
+         }
+         }
+   } else{
+   sales_today[nrow(sales_today)+1,] = "CHECK account=0"
+   }}
+
+sales_today$direct_ib[2] ="Jeryl Francis G. Cortez"
+check_d_w$value = sales_today$direct_ib
+```
+
+```{r}
+d_w_php_sales_without_rebate = rbind(check_d_w, d_w_left)
+```
+
+```{r}
+list = d_w_php_sales_without_rebate %>% getKPIfinalresults()
+list[[1]]
+```
+
+```{r}
+list[[2]]
+```
+
+```{r}
+output = d_w_php_sales_without_rebate %>% group_by(value, account) %>% summarise(
+  deposit = sum(deposit),
+  withdrawal = sum(withdrawal)
+) 
+# write.xlsx(as.data.frame(output), "output2.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = FALSE, append = FALSE)
+```

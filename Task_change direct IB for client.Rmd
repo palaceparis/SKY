@@ -1,0 +1,87 @@
+```{r warning=FALSE}
+library(XML)
+library(RCurl)
+library(RSelenium)
+library(tidyverse)
+library(rvest)
+library(htmltools)
+library("xlsx")
+```
+
+```{r startup}
+appURL <- 'https://broker.skyallmarkets.com/'
+username = "client@skyallmarkets.com"
+password = "OperationClient1234"
+rD <- rsDriver(browser = "chrome", port = 5093L, chromever="91.0.4472.101")
+remDr <- rD$client
+remDr$navigate(appURL)
+```
+
+```{r login}
+remDr$findElement(using = 'css selector', "#userName")$sendKeysToElement(list(username))
+remDr$findElement(using = 'css selector', "#passWord")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'css selector', "#submit")$clickElement()
+Sys.sleep(2)
+remDr$navigate("https://broker.skyallmarkets.com/custommgmt/customers?userId=117&userName=BENBERT%20M%20BENIERO")
+```
+
+```{r find link}
+acc = data.frame(value = numeric(), link = character())
+error_trace = data.frame(value = numeric())
+for (j in 1:4){
+for (i in 1:20){
+x = remDr$findElement(using = 'xpath', paste0("//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/table/tbody/tr[", i,"]/td[4]/a"))$getElementText()
+
+y = remDr$findElement(using = 'xpath', paste0("//*[@id='react-root']/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/table/tbody/tr[", i,"]/td[4]/a"))$getElementAttribute("href")
+acc = rbind(acc, c(x[1], y[1]))
+colnames(acc)[1] <- "acc"
+colnames(acc)[2] <- "link"
+}
+  if (j <4){
+    error_trace[nrow(error_trace)+1,] = c(j)
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div/div/ul/li[6]/a')$clickElement()
+Sys.sleep(2)
+  }
+  else{
+    error_trace[nrow(error_trace)+1,] = c(j)
+    Sys.sleep(2)
+  }
+}
+```
+
+```{r search}
+info = data.frame(IB = character())
+for (i in 1:40){
+remDr$navigate(acc$link[i])
+Sys.sleep(4)
+# group = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[2]/div[2]/div[1]/div[1]/div[2]/div/div[1]/div[2]/div/div/div/div/div')$getElementText() 
+IB = remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div/div[1]/div/div/div/div[2]/div[2]/div[1]/div/div/div/button')$getElementText() 
+info[nrow(info)+1,] = IB[[1]]
+}
+```
+
+```{r check}
+for (i in 1:nrow(info)){
+if (endsWith(info$group[i], "-2") == TRUE){
+  if (endsWith(info$group[i], "70-2") == FALSE){
+    print(paste0(i, "check"))    
+  } else{
+    print("All good")
+  }
+}
+}
+```
+
+```{r change}
+for (i in 48:nrow(acc)){
+remDr$navigate(acc$link[i])
+Sys.sleep(4)
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div/div[1]/div/div/div/div[2]/div[2]/div[1]/div/div/div/button')$clickElement()
+remDr$findElement(using = 'xpath','//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div/div[1]/div/div/div/div[2]/div[2]/div[1]/div/div/ul/li[1]/input')$sendKeysToElement(list("1083"))
+Sys.sleep(2)
+remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/div/div[1]/div/div/div[1]/div/div/div/div[2]/div[2]/div[1]/div/div/ul/li[3]/a')$clickElement()
+Sys.sleep(3)
+}
+```
+

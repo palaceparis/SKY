@@ -1,0 +1,19 @@
+
+```{r}
+library(tidyverse)
+library(janitor)
+library("xlsx")
+```
+
+
+```{r}
+raw <- read.csv(file = '/Users/tonygong/Downloads/SummaryReport_20220330082207.csv') %>% clean_names()
+```
+
+```{r}
+x = raw %>% filter(endsWith(sales_admin, "Yang Yongshun"))
+x= x %>% filter(category != "Introducing Broker")
+write.xlsx(x, "Yang Yongshun.xlsx", sheetName = "Sheet1", 
+  col.names = TRUE, row.names = TRUE, append = FALSE)
+```
+
