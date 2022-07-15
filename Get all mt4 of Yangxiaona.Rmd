@@ -6,7 +6,6 @@ library(jpeg)
 library(png)
 library("xlsx")
 library("readxl")
-# library(theoneCRM)
 library(janitor)
 library(Hmisc) # %nin%
 library(naniar) # visualize missing values

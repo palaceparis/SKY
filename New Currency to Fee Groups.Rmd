@@ -1,0 +1,310 @@
+```{r}
+library(RSelenium)
+library(tidyverse)
+library(readxl)
+library(jpeg)
+library(png)
+library("xlsx")
+library("readxl")
+library(janitor)
+library(Hmisc) # %nin%
+library(naniar) # visualize missing values
+library(rvest)
+```
+
+```{r}
+appURL <- 'https://my.skyamarkets.com/SuperAdmin/Clients'
+username = "admin@skyallmarkets.com"
+password = "123temp$"
+rD <- rsDriver(browser = "chrome", port = 1042L, chromever = "103.0.5060.53")
+# binman::list_versions("chromedriver")
+remDr <- rD$client
+remDr$navigate(appURL)
+Sys.sleep(4)
+# remDr$refresh
+remDr$findElement(using = 'id', "username")$sendKeysToElement(list(username))
+remDr$findElement(using = 'id', "password")$sendKeysToElement(list(password))
+Sys.sleep(2)
+remDr$findElement(using = 'id', "btn-submit")$clickElement()
+Sys.sleep(2)
+```
+
+
+```{r}
+category = read_excel("all_cat.xlsx") %>% janitor::clean_names()
+```
+
+
+```{r fee_group_settings}
+for (i in 5:nrow(category)){
+cat = category$name[i]
+remDr$findElement(using = 'xpath', "//input[@id='txtGroupName']")$sendKeysToElement(list(cat))
+# Currency
+remDr$findElement(using = 'xpath', '//*[@id="drpCurrency_chzn"]/a/span')$clickElement()
+if ( str_sub(cat, start = 4, end=4) == "E") {
+curr = "EUR"
+} else if ( str_sub(cat, start = 4, end=4) == "A") {
+curr = "AUD"
+} else if ( str_sub(cat, start = 4, end=4) == "G") {
+curr = "GBP"
+} else if (str_sub(cat, start = 4, end=4) == "C") {
+curr = "CAD"
+} else{
+curr = "NZD"  
+}
+remDr$findElement(using = 'xpath', '//*[@id="drpCurrency_chzn"]/div/div/input')$sendKeysToElement(list(curr))
+remDr$findElement(using = 'xpath', '//*[@id="drpCurrency_chzn"]/div/div/input')$sendKeysToElement(list(key = "enter"))
+
+# Server
+remDr$findElement(using = 'xpath', '//*[@id="drpTradingPlatform_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpTradingPlatform_chzn"]/div/div/input')$sendKeysToElement(list("MT Server 01"))
+remDr$findElement(using = 'xpath', '//*[@id="drpTradingPlatform_chzn"]/div/div/input')$sendKeysToElement(list(key = "enter"))
+Sys.sleep(4)
+
+# Platform Group
+remDr$findElement(using = 'xpath', '//*[@id="drpTradingPlatformGroup_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpTradingPlatformGroup_chzn"]/div/div/input')$sendKeysToElement(list(cat))
+remDr$findElement(using = 'xpath', '//*[@id="drpTradingPlatformGroup_chzn"]/div/div/input')$sendKeysToElement(list(key = "enter"))
+
+# Acc preference
+remDr$findElement(using = 'xpath', '//*[@id="drpAccountPreferences_chzn"]/a/span')$clickElement()
+acc = ifelse(str_sub(cat, start = 6, end=6) == "E",  "ECN", "Standard")
+remDr$findElement(using = 'xpath', '//*[@id="drpAccountPreferences_chzn"]/div/div/input')$sendKeysToElement(list(acc))
+remDr$findElement(using = 'xpath', '//*[@id="drpAccountPreferences_chzn"]/div/div/input')$sendKeysToElement(list(key = "enter"))
+
+# lot size, step and max size
+remDr$findElement(using = 'xpath', '//*[@id="txtMinLotSize"]')$sendKeysToElement(list("0.01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtStep"]')$sendKeysToElement(list("0.01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtMaxLotSize"]')$sendKeysToElement(list("80"))
+
+# Type
+remDr$findElement(using = 'xpath', '//*[@id="drpMarginType_chzn"]/a/span')$clickElement()
+acc = ifelse(str_sub(cat, start = 6, end=6) == "E",  "ECN", "Standard")
+remDr$findElement(using = 'xpath', '//*[@id="drpMarginType_chzn"]/div/div/input')$sendKeysToElement(list("Percent"))
+remDr$findElement(using = 'xpath', '//*[@id="drpMarginType_chzn"]/div/div/input')$sendKeysToElement(list(key = "enter"))
+
+# Leverage
+remDr$findElement(using = 'xpath', '//*[@id="drpLeverages_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpLeverages_chzn"]/div/div/input')$sendKeysToElement(list("1:400"))
+remDr$findElement(using = 'xpath', '//*[@id="drpLeverages_chzn"]/div/div/input')$sendKeysToElement(list(key = "enter"))
+
+# book
+if(str_sub(cat, start = -1, end=-1) == "2"){
+  remDr$findElement(using = 'xpath', '//*[@id="rdBBookYes"]')$clickElement()
+} else{
+  remDr$findElement(using = 'xpath', '//*[@id="rdBBookNo"]')$clickElement()
+}
+
+# Call Level
+remDr$findElement(using = 'xpath', '//*[@id="artCreatefeeGroup"]/div[1]/ul[5]/li[1]/input[2]')$sendKeysToElement(list("100"))
+# Stop Level
+remDr$findElement(using = 'xpath', '//*[@id="artCreatefeeGroup"]/div[1]/ul[5]/li[2]/input[2]')$sendKeysToElement(list("50"))
+
+# Other five
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadMarkup"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommission"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommissionRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="cbUseSecurities"]')$clickElement()
+
+# Submit
+remDr$findElement(using = 'xpath', '//*[@id="btnSubmitFeeGroup"]')$clickElement()
+Sys.sleep(4)
+
+remDr$findElement(using = 'xpath', '/html/body/div[1]/div[1]/aside/nav/ul/li[6]/ul/li[1]/a')$clickElement()
+Sys.sleep(6)
+}
+```
+
+```{r ecn_securities}
+remDr$findElement(using = 'css selector', '#artTab > div:nth-child(1) > ul > li > a')$clickElement()
+Sys.sleep(2)
+
+# Bullion
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn"]/ul/li/input')$clickElement()
+remDr$findElement(using = 'css selector', '#drpSecurity_chzn_o_3')$clickElement()
+remDr$findElement(using = 'css selector', '#txtMinLotSize')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtStep"]')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadMarkup"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommission"]')$sendKeysToElement(list( "7"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommissionRebate"]')$sendKeysToElement(list("4"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinCommission"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn_o_1"]')$clickElement()
+remDr$findElement(using = 'css selector', '#btnAddSecurities')$clickElement()
+Sys.sleep(4)
+
+remDr$findElement(using = 'css selector', '#artTab > div:nth-child(1) > ul > li > a')$clickElement()
+Sys.sleep(2)
+
+# Crypto
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn"]/ul')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn_o_1"]')$clickElement()
+remDr$findElement(using = 'css selector', '#txtMinLotSize')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtStep"]')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadMarkup"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommission"]')$sendKeysToElement(list( "0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommissionRebate"]')$sendKeysToElement(list("8"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinCommission"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn_o_1"]')$clickElement()
+remDr$findElement(using = 'css selector', '#btnAddSecurities')$clickElement()
+Sys.sleep(4)
+
+remDr$findElement(using = 'css selector', '#artTab > div:nth-child(1) > ul > li > a')$clickElement()
+Sys.sleep(2)
+
+# Forex
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn"]/ul')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn_o_0"]')$clickElement()
+remDr$findElement(using = 'css selector', '#txtMinLotSize')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtStep"]')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadMarkup"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommission"]')$sendKeysToElement(list( "7"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommissionRebate"]')$sendKeysToElement(list("4"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinCommission"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn_o_1"]')$clickElement()
+remDr$findElement(using = 'css selector', '#btnAddSecurities')$clickElement()
+Sys.sleep(4)
+
+remDr$findElement(using = 'css selector', '#artTab > div:nth-child(1) > ul > li > a')$clickElement()
+Sys.sleep(2)
+
+# Index
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn"]/ul')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn_o_0"]')$clickElement()
+remDr$findElement(using = 'css selector', '#txtMinLotSize')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtStep"]')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadMarkup"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommission"]')$sendKeysToElement(list( "1.5"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommissionRebate"]')$sendKeysToElement(list("1.2"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinCommission"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn_o_1"]')$clickElement()
+remDr$findElement(using = 'css selector', '#btnAddSecurities')$clickElement()
+Sys.sleep(4)
+
+remDr$findElement(using = 'css selector', '#artTab > div:nth-child(1) > ul > li > a')$clickElement()
+Sys.sleep(2)
+
+# Oil
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn"]/ul')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn_o_0"]')$clickElement()
+remDr$findElement(using = 'css selector', '#txtMinLotSize')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtStep"]')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadMarkup"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommission"]')$sendKeysToElement(list( "0.7"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommissionRebate"]')$sendKeysToElement(list("0.2"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinCommission"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn_o_1"]')$clickElement()
+remDr$findElement(using = 'css selector', '#btnAddSecurities')$clickElement()
+```
+
+```{r std_securities}
+remDr$findElement(using = 'css selector', '#artTab > div:nth-child(1) > ul > li > a')$clickElement()
+Sys.sleep(2)
+
+# Bullion
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn"]/ul/li/input')$clickElement()
+remDr$findElement(using = 'css selector', '#drpSecurity_chzn_o_3')$clickElement()
+remDr$findElement(using = 'css selector', '#txtMinLotSize')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtStep"]')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadMarkup"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadRebate"]')$sendKeysToElement(list("18"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommission"]')$sendKeysToElement(list( "0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommissionRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinCommission"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn_o_1"]')$clickElement()
+remDr$findElement(using = 'css selector', '#btnAddSecurities')$clickElement()
+Sys.sleep(4)
+
+remDr$findElement(using = 'css selector', '#artTab > div:nth-child(1) > ul > li > a')$clickElement()
+Sys.sleep(2)
+
+# Crypto
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn"]/ul')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn_o_1"]')$clickElement()
+remDr$findElement(using = 'css selector', '#txtMinLotSize')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtStep"]')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadMarkup"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadRebate"]')$sendKeysToElement(list("8"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommission"]')$sendKeysToElement(list( "0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommissionRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinCommission"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn_o_1"]')$clickElement()
+remDr$findElement(using = 'css selector', '#btnAddSecurities')$clickElement()
+Sys.sleep(4)
+
+remDr$findElement(using = 'css selector', '#artTab > div:nth-child(1) > ul > li > a')$clickElement()
+Sys.sleep(2)
+
+# Forex
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn"]/ul')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn_o_0"]')$clickElement()
+remDr$findElement(using = 'css selector', '#txtMinLotSize')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtStep"]')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadMarkup"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadRebate"]')$sendKeysToElement(list("8"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommission"]')$sendKeysToElement(list( "0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommissionRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinCommission"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn_o_1"]')$clickElement()
+remDr$findElement(using = 'css selector', '#btnAddSecurities')$clickElement()
+Sys.sleep(4)
+
+remDr$findElement(using = 'css selector', '#artTab > div:nth-child(1) > ul > li > a')$clickElement()
+Sys.sleep(2)
+
+# Index
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn"]/ul')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn_o_0"]')$clickElement()
+remDr$findElement(using = 'css selector', '#txtMinLotSize')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtStep"]')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadMarkup"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadRebate"]')$sendKeysToElement(list("1.2"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommission"]')$sendKeysToElement(list( "0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommissionRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinCommission"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn_o_1"]')$clickElement()
+remDr$findElement(using = 'css selector', '#btnAddSecurities')$clickElement()
+Sys.sleep(4)
+
+remDr$findElement(using = 'css selector', '#artTab > div:nth-child(1) > ul > li > a')$clickElement()
+Sys.sleep(2)
+
+# Oil
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn"]/ul')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpSecurity_chzn_o_0"]')$clickElement()
+remDr$findElement(using = 'css selector', '#txtMinLotSize')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtStep"]')$sendKeysToElement(list("0..01"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadMarkup"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSpreadRebate"]')$sendKeysToElement(list("2"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommission"]')$sendKeysToElement(list( "0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtCommissionRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinCommission"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="txtSecMinRebate"]')$sendKeysToElement(list("0"))
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn"]/a/span')$clickElement()
+remDr$findElement(using = 'xpath', '//*[@id="drpChargedPer_chzn_o_1"]')$clickElement()
+remDr$findElement(using = 'css selector', '#btnAddSecurities')$clickElement()
+```
+
